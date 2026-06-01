@@ -33,6 +33,12 @@ POLA_INTENT: list[tuple[str, list[str]]] = [
 ]
 
 
+# Kata yang bukan nama produk — hasil ekstraksi invalid
+KATA_BUKAN_PRODUK = frozenset({
+    "berapa", "sisa", "tinggal", "ada", "masih", "min", "max",
+})
+
+
 def normalisasi_teks(pesan: str) -> str:
     """Lowercase dan bersihkan filler umum."""
     teks = pesan.lower().strip()
@@ -52,7 +58,9 @@ def ekstrak_nama_produk(pesan: str) -> Optional[str]:
     ):
         m = re.search(pola, teks)
         if m:
-            return m.group(1).strip()
+            nama = m.group(1).strip()
+            if nama and nama not in KATA_BUKAN_PRODUK:
+                return nama
     return None
 
 

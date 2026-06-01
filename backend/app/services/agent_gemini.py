@@ -1,0 +1,85 @@
+"""
+Integrasi Gemini untuk klasifikasi intent (Agent Builder / Vertex AI).
+
+Fallback ke regex jika kredensial belum dikonfigurasi.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Optional
+
+from app.config import ambil_pengaturan
+from app.services.klasifikasi import INTENT_LIST, klasifikasi_intent
+
+_PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "wargio_system.txt"
+
+INTENT_VALID = {i for i in INTENT_LIST if i != "unknown"}
+
+
+@lru_cache
+def _muat_system_prompt() -> str:
+    return _PROMPT_PATH.read_text(encoding="utf-8")
+
+
+def _buat_klien_gemini():
+    """Buat klien google-genai jika kredensial tersedia."""
+    pengaturan = ambil_pengaturan()
+    if not pengaturan.gemini_terkonfigurasi:
+        return None
+
+    from google import genai
+
+    if pengaturan.gemini_api_key:
+        return genai.Client(api_key=pengaturan.gemini_api_key)
+
+    return genai.Client(
+        vertexai=True,
+        project=pengaturan.google_cloud_project,
+        location=pengaturan.google_cloud_location,
+    )
+
+
+async def klasifikasi_dengan_gemini(pesan: str) -> Optional[str]:
+    """
+    Klasifikasi intent via Gemini. Return None jika gagal → fallback regex.
+    """
+    klien = _buat_klien_gemini()
+    if klien is None:
+        return None
+
+    pengaturan = ambil_pengaturan()
+    prompt = (
+        f"{_muat_system_prompt()}\n\n"
+        f"Classify this user message into one intent: {', '.join(sorted(INTENT_VALID))}, or unknown.\n"
+        f"User message: {pesan}\n"
+        "Reply with ONLY the intent name, nothing else."
+    )
+
+    try:
+        respons = klien.models.generate_content(
+            model=pengaturan.gemini_model,
+            contents=prompt,
+        )
+        teks = (respons.text or "").strip().lower().replace("-", "_")
+        # Ambil token intent pertama yang valid
+        for intent in INTENT_VALID | {"unknown"}:
+            if intent in teks.split():
+                return intent if intent != "unknown" else None
+        if teks in INTENT_VALID:
+            return teks
+        return None
+    except Exception:
+        return None
+
+
+async def tentukan_intent(pesan: str) -> tuple[str, str]:
+    """
+    Tentukan intent + mode klasifikasi (gemini atau regex).
+    """
+    intent_gemini = await klasifikasi_dengan_gemini(pesan)
+    if intent_gemini:
+        return intent_gemini, "gemini"
+
+    return klasifikasi_intent(pesan), "regex"

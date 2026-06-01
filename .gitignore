@@ -7,6 +7,9 @@
 credentials.json
 service-account*.json
 
+# ADK lokal
+**/.adk/
+
 # Python
 __pycache__/
 *.py[cod]

@@ -13,7 +13,7 @@ from app.services.intent_handlers import (
     handle_restock_alert,
     handle_sales_report,
 )
-from app.services.klasifikasi import klasifikasi_intent
+from app.services.agent_gemini import tentukan_intent
 
 MAX_COBA_ULANG = 1
 
@@ -59,7 +59,7 @@ async def proses_pesan(
     pesan: str,
 ) -> dict[str, Any]:
     """Klasifikasi + eksekusi intent, return balasan terstruktur."""
-    intent = klasifikasi_intent(pesan)
+    intent, mode_klasifikasi = await tentukan_intent(pesan)
     try:
         balasan, aksi = await jalankan_dengan_retry(db, intent, pesan)
     except Exception:
@@ -67,8 +67,12 @@ async def proses_pesan(
         aksi = ["error_atlas"]
         intent = intent if intent != "unknown" else "error"
 
+    if mode_klasifikasi == "gemini" and "agent:gemini" not in aksi:
+        aksi = ["agent:gemini", *aksi]
+
     return {
         "balasan": balasan,
         "intent": intent if intent != "unknown" else None,
         "actions_taken": aksi,
+        "classification_mode": mode_klasifikasi,
     }

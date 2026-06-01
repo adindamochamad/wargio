@@ -7,19 +7,18 @@ from typing import Any, Optional
 
 from pymongo.asynchronous.database import AsyncDatabase
 
+from app.services.atlas_tools import mcp_find
+
 
 async def cari_produk(
     db: AsyncDatabase,
     kata_kunci: str,
     batas: int = 3,
-) -> list[dict[str, Any]]:
-    """
-    Cari produk by nama atau alias (partial match).
-    Return max `batas` hasil, urut relevansi sederhana.
-    """
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Cari produk by nama atau alias (partial match)."""
     teks = kata_kunci.lower().strip()
     if not teks:
-        return []
+        return [], []
 
     filter_query = {
         "$or": [
@@ -27,23 +26,20 @@ async def cari_produk(
             {"name_aliases": {"$regex": re.escape(teks), "$options": "i"}},
         ]
     }
-    kursor = db.products.find(filter_query).limit(batas)
-    return await kursor.to_list(length=batas)
+    return await mcp_find(db, "products", filter_query, limit=batas)
 
 
 async def resolve_produk_tunggal(
     db: AsyncDatabase,
     kata_kunci: Optional[str],
-) -> tuple[Optional[dict[str, Any]], list[dict[str, Any]]]:
-    """
-    Resolve satu produk. Jika ambigu return (None, opsi).
-    """
+) -> tuple[Optional[dict[str, Any]], list[dict[str, Any]], list[str]]:
+    """Resolve satu produk. Jika ambigu return (None, opsi, aksi)."""
     if not kata_kunci:
-        return None, []
+        return None, [], []
 
-    hasil = await cari_produk(db, kata_kunci, batas=5)
+    hasil, aksi = await cari_produk(db, kata_kunci, batas=5)
     if len(hasil) == 1:
-        return hasil[0], []
+        return hasil[0], [], aksi
     if len(hasil) > 1:
-        return None, hasil[:3]
-    return None, []
+        return None, hasil[:3], aksi
+    return None, [], aksi

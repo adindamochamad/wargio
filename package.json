@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "verifikasi:mcp": "node scripts/verifikasi_mcp.mjs"
+    "verifikasi:mcp": "node scripts/verifikasi_mcp.mjs",
+    "verifikasi:mcp-live": "backend/.venv/bin/python scripts/verifikasi_mcp_live.py"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"

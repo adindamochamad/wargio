@@ -43,4 +43,5 @@ async def chat(
         balasan=hasil["balasan"],
         session_id=session_id,
         intent=hasil.get("intent"),
+        classification_mode=hasil.get("classification_mode"),
     )

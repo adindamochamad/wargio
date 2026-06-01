@@ -59,6 +59,12 @@ Lolos penuh Hari 1 hanya jika semua gate hijau (termasuk Atlas + seed).
 - [x] Implement session context via `X-Session-Id`.
 - [x] Tambah unit test minimal 3 kasus per intent.
 - [x] Tangani error MCP dengan retry 1x *(retry Atlas query 1x)*.
+- [x] System prompt Wargio (`backend/app/prompts/wargio_system.txt`).
+- [x] Layer MCP-equivalent tools (`atlas_tools.py`) + optional MCP live.
+- [x] Integrasi Gemini agent (fallback regex jika belum dikonfigurasi).
+- [x] API terima field `pesan` atau `message`.
+- [x] Deploy ADK agent ke Agent Engine (`agent/wargio`, ID di `.env`).
+- [x] MCP live enabled (`MCP_LIVE_ENABLED=true`, pool stdio + verifikasi).
 
 ### Definition of Done
 - [x] 4 query read intent return respons masuk akal dan konsisten dengan data Atlas.

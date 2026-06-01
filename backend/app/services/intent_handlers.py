@@ -1,13 +1,14 @@
-"""Handler intent Tier 1 read."""
+"""Handler intent Tier 1 read — query via MCP-equivalent tools."""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from pymongo.asynchronous.database import AsyncDatabase
 
+from app.services.atlas_tools import mcp_aggregate, mcp_find
 from app.services.klasifikasi import ekstrak_nama_customer, ekstrak_nama_produk
 from app.services.produk import resolve_produk_tunggal
 from app.util.format import format_rupiah, tanggal_indonesia
@@ -17,7 +18,7 @@ async def handle_check_stock(
     db: AsyncDatabase,
     pesan: str,
 ) -> tuple[str, list[str]]:
-    """Cek stok produk — find products."""
+    """Cek stok produk — MCP find products."""
     kata_kunci = ekstrak_nama_produk(pesan)
     if not kata_kunci:
         return (
@@ -26,7 +27,7 @@ async def handle_check_stock(
             ["minta_spesifikasi_produk"],
         )
 
-    produk, opsi = await resolve_produk_tunggal(db, kata_kunci)
+    produk, opsi, aksi_cari = await resolve_produk_tunggal(db, kata_kunci)
     if opsi:
         baris = "\n".join(
             f"  {i + 1}. {p['name']} (stok: {p['stock_current']})"
@@ -34,12 +35,12 @@ async def handle_check_stock(
         )
         return (
             f"Maksudnya yang mana?\n{baris}",
-            ["disambiguasi_produk"],
+            [*aksi_cari, "disambiguasi_produk"],
         )
     if not produk:
         return (
             f"Produk \"{kata_kunci}\" tidak ditemukan. Coba sebut nama yang lebih spesifik.",
-            ["produk_tidak_ditemukan"],
+            [*aksi_cari, "produk_tidak_ditemukan"],
         )
 
     stok = produk["stock_current"]
@@ -54,14 +55,14 @@ async def handle_check_stock(
         f"Stok **{produk['name']}**: {stok} {produk['unit']} "
         f"(minimum {minimum}). Status: {status}."
     )
-    return balasan, ["find_products", "compare_minimum"]
+    return balasan, [*aksi_cari, "compare_minimum"]
 
 
 async def handle_check_debt(
     db: AsyncDatabase,
     pesan: str,
 ) -> tuple[str, list[str]]:
-    """Cek hutang customer — find customers."""
+    """Cek hutang customer — MCP find customers."""
     nama = ekstrak_nama_customer(pesan)
     if not nama:
         return (
@@ -69,22 +70,26 @@ async def handle_check_debt(
             ["minta_nama_customer"],
         )
 
-    kursor = db.customers.find({"name": {"$regex": nama, "$options": "i"}}).limit(3)
-    hasil = await kursor.to_list(length=3)
+    hasil, aksi = await mcp_find(
+        db,
+        "customers",
+        {"name": {"$regex": nama, "$options": "i"}},
+        limit=3,
+    )
 
     if len(hasil) == 0:
         return (
             f"Customer \"{nama}\" tidak ditemukan.",
-            ["customer_tidak_ditemukan"],
+            [*aksi, "customer_tidak_ditemukan"],
         )
     if len(hasil) > 1:
         baris = "\n".join(f"  {i + 1}. {c['name']}" for i, c in enumerate(hasil))
-        return f"Ada beberapa yang cocok:\n{baris}", ["disambiguasi_customer"]
+        return f"Ada beberapa yang cocok:\n{baris}", [*aksi, "disambiguasi_customer"]
 
     cust = hasil[0]
     total = cust.get("debt_total", 0)
     if total <= 0:
-        return f"{cust['name']} tidak punya hutang aktif.", ["find_customers"]
+        return f"{cust['name']} tidak punya hutang aktif.", aksi
 
     belum_bayar = [h for h in cust.get("debt_history", []) if not h.get("paid")]
     rincian = "\n".join(
@@ -94,18 +99,23 @@ async def handle_check_debt(
     return (
         f"Hutang **{cust['name']}** total **{format_rupiah(total)}**.\n"
         f"Rincian:\n{rincian or '  (tidak ada detail)'}",
-        ["find_customers", "hitung_total_hutang"],
+        [*aksi, "hitung_total_hutang"],
     )
 
 
 async def handle_restock_alert(db: AsyncDatabase) -> tuple[str, list[str]]:
-    """Produk stok rendah — find + sort urgency."""
+    """Produk stok rendah — MCP find + sort urgency."""
     filter_rendah = {"$expr": {"$lte": ["$stock_current", "$stock_minimum"]}}
-    kursor = db.products.find(filter_rendah).sort("stock_current", 1).limit(10)
-    hasil = await kursor.to_list(length=10)
+    hasil, aksi = await mcp_find(
+        db,
+        "products",
+        filter_rendah,
+        limit=10,
+        sort=[("stock_current", 1)],
+    )
 
     if not hasil:
-        return "Semua produk masih aman, tidak ada yang perlu restock urgent.", ["find_products"]
+        return "Semua produk masih aman, tidak ada yang perlu restock urgent.", aksi
 
     baris = []
     for p in hasil:
@@ -116,7 +126,7 @@ async def handle_restock_alert(db: AsyncDatabase) -> tuple[str, list[str]]:
         )
     return (
         f"Produk yang perlu restock ({len(hasil)}):\n" + "\n".join(baris),
-        ["find_products", "rank_urgency"],
+        [*aksi, "rank_urgency"],
     )
 
 
@@ -124,12 +134,11 @@ async def handle_sales_report(
     db: AsyncDatabase,
     pesan: str,
 ) -> tuple[str, list[str]]:
-    """Laporan penjualan hari ini — aggregate transactions."""
+    """Laporan penjualan — MCP aggregate transactions."""
     zona = ZoneInfo("Asia/Jakarta")
     sekarang = datetime.now(zona)
     awal_hari = sekarang.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    # Deteksi rentang sederhana
     teks = pesan.lower()
     if "minggu" in teks:
         awal = awal_hari - timedelta(days=7)
@@ -138,7 +147,6 @@ async def handle_sales_report(
         awal = awal_hari
         label = f"hari ini ({tanggal_indonesia(sekarang.astimezone(timezone.utc))})"
 
-    # Query pakai UTC agar match dokumen seed
     awal_utc = awal.astimezone(timezone.utc)
     sekarang_utc = sekarang.astimezone(timezone.utc)
 
@@ -157,15 +165,14 @@ async def handle_sales_report(
             }
         },
     ]
-    kursor = await db.transactions.aggregate(pipeline)
-    agg = await kursor.to_list(length=1)
+    agg, aksi = await mcp_aggregate(db, "transactions", pipeline)
 
     if not agg:
-        return f"Belum ada penjualan untuk {label}.", ["aggregate_transactions"]
+        return f"Belum ada penjualan untuk {label}.", aksi
 
     data = agg[0]
     return (
         f"Pendapatan **{label}**: **{format_rupiah(data['total_omzet'])}** "
         f"dari {data['jumlah_transaksi']} transaksi.",
-        ["aggregate_transactions", "format_laporan"],
+        [*aksi, "format_laporan"],
     )

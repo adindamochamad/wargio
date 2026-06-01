@@ -1,4 +1,4 @@
-"""Health check — verifikasi API dan koneksi Atlas."""
+"""Health check — verifikasi API, Atlas, MCP, dan Gemini."""
 
 from fastapi import APIRouter
 
@@ -19,9 +19,26 @@ async def health_check() -> dict:
     if pengaturan.atlas_terkonfigurasi:
         atlas_ok = await cek_koneksi_atlas()
 
+    mcp_ok = False
+    mcp_live = pengaturan.mcp_live_enabled
+    if atlas_ok and mcp_live:
+        from app.services.mcp_klien import cek_mcp_hidup
+
+        mcp_ok = await cek_mcp_hidup()
+    elif atlas_ok:
+        mcp_ok = True
+
     return {
         "status": "ok",
         "service": "wargio-api",
         "atlas": atlas_ok,
         "atlas_configured": pengaturan.atlas_terkonfigurasi,
+        "mcp": mcp_ok,
+        "mcp_live_enabled": mcp_live,
+        "mcp_mode": "live_stdio" if mcp_live else "pymongo_equivalent",
+        "gemini_configured": pengaturan.gemini_terkonfigurasi,
+        "agent_engine_id": pengaturan.agent_engine_id or None,
+        "agent_engine_deployed": bool(pengaturan.agent_engine_id),
+        "agent_mode": "gemini" if pengaturan.gemini_terkonfigurasi else "intent_engine",
+        "system_prompt": "backend/app/prompts/wargio_system.txt",
     }
