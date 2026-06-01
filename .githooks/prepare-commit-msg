@@ -1,0 +1,3 @@
+#!/bin/sh
+# Hapus trailer Co-authored-by agar history hanya author pemilik repo
+sed -i '' '/^Co-authored-by:/d' "$1" 2>/dev/null || sed -i '/^Co-authored-by:/d' "$1"

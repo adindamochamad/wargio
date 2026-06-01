@@ -1,10 +1,13 @@
-"""Endpoint chat — stub Hari 1, agent penuh Hari 2."""
+"""Endpoint chat — intent engine Hari 2."""
 
 import uuid
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Header, HTTPException
 
+from app.db.koneksi import dapatkan_database
 from app.schemas.chat import PermintaanChat, ResponsChat
+from app.services.executor import proses_pesan
+from app.services.sesi import muat_atau_buat_sesi, simpan_pesan
 
 router = APIRouter(tags=["chat"])
 
@@ -14,16 +17,30 @@ async def chat(
     body: PermintaanChat,
     x_session_id: str | None = Header(default=None, alias="X-Session-Id"),
 ) -> ResponsChat:
-    """
-    Menerima pesan user. Hari 1: echo + session id.
-    Hari 2+: routing ke Agent Builder + MCP.
-    """
+    """Terima pesan, klasifikasi intent, query Atlas, simpan sesi."""
     session_id = x_session_id or str(uuid.uuid4())
+
+    try:
+        db = await dapatkan_database()
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    await muat_atau_buat_sesi(db, session_id)
+    await simpan_pesan(db, session_id, "user", body.pesan)
+
+    hasil = await proses_pesan(db, body.pesan)
+
+    await simpan_pesan(
+        db,
+        session_id,
+        "assistant",
+        hasil["balasan"],
+        intent=hasil.get("intent"),
+        aksi=hasil.get("actions_taken"),
+    )
+
     return ResponsChat(
-        balasan=(
-            "Wargio siap. Koneksi agent dan intent engine aktif di Hari 2. "
-            f"Pesan Anda diterima ({len(body.pesan)} karakter)."
-        ),
+        balasan=hasil["balasan"],
         session_id=session_id,
-        intent=None,
+        intent=hasil.get("intent"),
     )
