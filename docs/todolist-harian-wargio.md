@@ -52,16 +52,16 @@ Lolos penuh Hari 1 hanya jika semua gate hijau (termasuk Atlas + seed).
 - 4 intent baca berjalan dari chat API.
 
 ### Todo
-- [ ] Implement `check_stock`.
-- [ ] Implement `check_debt`.
-- [ ] Implement `restock_alert`.
-- [ ] Implement `sales_report`.
-- [ ] Implement session context via `X-Session-Id`.
-- [ ] Tambah unit test minimal 3 kasus per intent.
-- [ ] Tangani error MCP dengan retry 1x.
+- [x] Implement `check_stock`.
+- [x] Implement `check_debt`.
+- [x] Implement `restock_alert`.
+- [x] Implement `sales_report`.
+- [x] Implement session context via `X-Session-Id`.
+- [x] Tambah unit test minimal 3 kasus per intent.
+- [x] Tangani error MCP dengan retry 1x *(retry Atlas query 1x)*.
 
 ### Definition of Done
-- [ ] 4 query read intent return respons masuk akal dan konsisten dengan data Atlas.
+- [x] 4 query read intent return respons masuk akal dan konsisten dengan data Atlas.
 
 ## Hari 3 — Tier 1 Write + Tier 2 Dasar
 
