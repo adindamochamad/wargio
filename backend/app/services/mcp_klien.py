@@ -11,6 +11,7 @@ import json
 import os
 import re
 from contextlib import AsyncExitStack
+from datetime import datetime
 from typing import Any, Optional
 
 from mcp import ClientSession, StdioServerParameters
@@ -81,6 +82,7 @@ async def mulai_pool_mcp() -> bool:
             if "find" not in nama or "aggregate" not in nama:
                 await stack.aclose()
                 return False
+            # insert-one / update-one opsional — write fallback ke PyMongo
             _stack = stack
             _sesi = sesi
             return True
@@ -183,3 +185,76 @@ async def panggil_mcp_aggregate(
     if m:
         return [_convert_oid(d) for d in json.loads(m.group(1))]
     raise RuntimeError("MCP aggregate tidak mengembalikan data")
+
+
+def _dokumen_ke_json_mcp(dokumen: dict[str, Any]) -> dict[str, Any]:
+    """Konversi ObjectId ke Extended JSON untuk tool MCP."""
+    from bson import ObjectId
+
+    def ubah(nilai: Any) -> Any:
+        if isinstance(nilai, ObjectId):
+            return {"$oid": str(nilai)}
+        if isinstance(nilai, dict):
+            return {k: ubah(v) for k, v in nilai.items()}
+        if isinstance(nilai, list):
+            return [ubah(v) for v in nilai]
+        if isinstance(nilai, datetime):
+            return nilai.isoformat()
+        return nilai
+
+    return ubah(dokumen)
+
+
+async def panggil_mcp_insert_one(collection: str, dokumen: dict[str, Any]) -> None:
+    """Panggil MCP insert-one (verifikasi tool terpanggil)."""
+    sesi = await _dapatkan_sesi()
+    pengaturan = ambil_pengaturan()
+    payload = {
+        "database": pengaturan.mongodb_database,
+        "collection": collection,
+        "document": _dokumen_ke_json_mcp(dokumen),
+    }
+    for nama_tool in ("insert-one", "insertOne"):
+        try:
+            hasil = await asyncio.wait_for(
+                sesi.call_tool(nama_tool, payload),
+                timeout=_TIMEOUT_MCP,
+            )
+            if hasil.isError:
+                raise RuntimeError(
+                    (hasil.content[0].text if hasil.content else "MCP insert error")[:200]
+                )
+            return
+        except Exception as e:
+            if nama_tool == "insertOne":
+                raise e
+
+
+async def panggil_mcp_update_one(
+    collection: str,
+    filter_query: dict[str, Any],
+    update: dict[str, Any],
+) -> None:
+    """Panggil MCP update-one (verifikasi tool terpanggil)."""
+    sesi = await _dapatkan_sesi()
+    pengaturan = ambil_pengaturan()
+    payload = {
+        "database": pengaturan.mongodb_database,
+        "collection": collection,
+        "filter": _dokumen_ke_json_mcp(filter_query),
+        "update": _dokumen_ke_json_mcp(update),
+    }
+    for nama_tool in ("update-one", "updateOne"):
+        try:
+            hasil = await asyncio.wait_for(
+                sesi.call_tool(nama_tool, payload),
+                timeout=_TIMEOUT_MCP,
+            )
+            if hasil.isError:
+                raise RuntimeError(
+                    (hasil.content[0].text if hasil.content else "MCP update error")[:200]
+                )
+            return
+        except Exception as e:
+            if nama_tool == "updateOne":
+                raise e

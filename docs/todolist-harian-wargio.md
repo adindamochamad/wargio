@@ -75,18 +75,18 @@ Lolos penuh Hari 1 hanya jika semua gate hijau (termasuk Atlas + seed).
 - Write intents aman dan tervalidasi.
 
 ### Todo
-- [ ] Implement `record_sale` (cek stok -> konfirmasi -> insert transaksi -> update stok).
-- [ ] Implement `record_payment` (resolve customer -> konfirmasi -> update hutang -> insert transaksi).
-- [ ] Implement disambiguasi produk/customer ambigu.
-- [ ] Reject jelas untuk stok tidak cukup atau qty invalid.
-- [ ] Implement `debt_collection` dasar.
-- [ ] Implement `sales_forecast` sederhana (day-of-week average).
-- [ ] Tambah integration test flow `record_sale -> check_stock`.
+- [x] Implement `record_sale` (cek stok -> konfirmasi -> insert transaksi -> update stok).
+- [x] Implement `record_payment` (resolve customer -> konfirmasi -> update hutang -> insert transaksi).
+- [x] Implement disambiguasi produk/customer ambigu.
+- [x] Reject jelas untuk stok tidak cukup atau qty invalid.
+- [x] Implement `debt_collection` dasar.
+- [x] Implement `sales_forecast` sederhana (day-of-week average).
+- [x] Tambah integration test flow `record_sale -> check_stock`.
 
 ### Definition of Done
-- [ ] Penjualan tercatat di `transactions`.
-- [ ] `stock_current` berkurang sesuai qty.
-- [ ] Tidak ada write tanpa konfirmasi.
+- [x] Penjualan tercatat di `transactions`.
+- [x] `stock_current` berkurang sesuai qty.
+- [x] Tidak ada write tanpa konfirmasi.
 
 ## Hari 4 — Frontend MVP
 

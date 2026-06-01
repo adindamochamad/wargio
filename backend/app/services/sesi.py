@@ -53,3 +53,27 @@ async def simpan_pesan(
             "$set": {"updated_at": sekarang},
         },
     )
+
+
+async def ambil_context(
+    db: AsyncDatabase,
+    session_id: str,
+) -> dict[str, Any]:
+    """Ambil context sesi (pending write, dll)."""
+    dokumen = await db.agent_sessions.find_one({"session_id": session_id})
+    if not dokumen:
+        return {}
+    return dict(dokumen.get("context") or {})
+
+
+async def set_context(
+    db: AsyncDatabase,
+    session_id: str,
+    context: dict[str, Any],
+) -> None:
+    """Update seluruh context sesi."""
+    sekarang = datetime.now(timezone.utc)
+    await db.agent_sessions.update_one(
+        {"session_id": session_id},
+        {"$set": {"context": context, "updated_at": sekarang}},
+    )

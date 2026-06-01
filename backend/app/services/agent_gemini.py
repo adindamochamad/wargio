@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from app.config import ambil_pengaturan
-from app.services.klasifikasi import INTENT_LIST, klasifikasi_intent
+from app.services.klasifikasi import INTENT_LIST, klasifikasi_intent  # noqa: F401
 
 _PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "wargio_system.txt"
 
@@ -77,9 +77,20 @@ async def klasifikasi_dengan_gemini(pesan: str) -> Optional[str]:
 async def tentukan_intent(pesan: str) -> tuple[str, str]:
     """
     Tentukan intent + mode klasifikasi (gemini atau regex).
+    Write/tier2: regex diutamakan jika berbeda dari Gemini (lebih deterministik).
     """
+    intent_regex = klasifikasi_intent(pesan)
+    intent_prioritas = {
+        "record_sale",
+        "record_payment",
+        "debt_collection",
+        "sales_forecast",
+    }
+
     intent_gemini = await klasifikasi_dengan_gemini(pesan)
+    if intent_regex in intent_prioritas:
+        return intent_regex, "regex"
     if intent_gemini:
         return intent_gemini, "gemini"
 
-    return klasifikasi_intent(pesan), "regex"
+    return intent_regex, "regex"

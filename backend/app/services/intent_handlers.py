@@ -176,3 +176,73 @@ async def handle_sales_report(
         f"dari {data['jumlah_transaksi']} transaksi.",
         [*aksi, "format_laporan"],
     )
+
+
+async def handle_debt_collection(db: AsyncDatabase) -> tuple[str, list[str]]:
+    """Daftar customer dengan hutang aktif — find + sort."""
+    hasil, aksi = await mcp_find(
+        db,
+        "customers",
+        {"debt_total": {"$gt": 0}},
+        limit=15,
+        sort=[("debt_total", -1)],
+    )
+    if not hasil:
+        return "Tidak ada customer dengan hutang aktif.", aksi
+
+    baris = []
+    for c in hasil:
+        baris.append(
+            f"  - **{c['name']}**: {format_rupiah(c.get('debt_total', 0))}"
+        )
+    return (
+        f"Customer dengan hutang ({len(hasil)}):\n" + "\n".join(baris),
+        [*aksi, "sort_debt"],
+    )
+
+
+async def handle_sales_forecast(db: AsyncDatabase) -> tuple[str, list[str]]:
+    """Forecast sederhana — rata-rata transaksi per hari dalam seminggu (30 hari)."""
+    zona = ZoneInfo("Asia/Jakarta")
+    sekarang = datetime.now(zona)
+    awal = (sekarang - timedelta(days=30)).astimezone(timezone.utc)
+    besok = (sekarang + timedelta(days=1)).weekday()
+
+    nama_hari = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+
+    pipeline: list[dict[str, Any]] = [
+        {"$match": {"type": "sale", "created_at": {"$gte": awal}}},
+        {
+            "$group": {
+                "_id": {"$dayOfWeek": "$created_at"},
+                "jumlah_transaksi": {"$sum": 1},
+                "total_omzet": {"$sum": "$total"},
+            }
+        },
+    ]
+    agg, aksi = await mcp_aggregate(db, "transactions", pipeline)
+
+    if not agg:
+        return "Belum cukup data penjualan untuk forecast.", aksi
+
+    # MongoDB dayOfWeek: 1=Minggu ... 7=Sabtu; Python weekday: 0=Senin
+    peta_mongo_ke_py = {2: 0, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 1: 6}
+    peta_py: dict[int, dict[str, Any]] = {}
+    for baris in agg:
+        dow = baris["_id"]
+        py_day = peta_mongo_ke_py.get(dow, 0)
+        minggu = max(30 / 7, 1)
+        peta_py[py_day] = {
+            "avg_tx": baris["jumlah_transaksi"] / minggu,
+            "avg_omzet": baris["total_omzet"] / minggu,
+        }
+
+    pred = peta_py.get(besok, {"avg_tx": 0, "avg_omzet": 0})
+    level = "ramai" if pred["avg_tx"] >= 8 else "sedang" if pred["avg_tx"] >= 4 else "sepi"
+
+    return (
+        f"Perkiraan **{nama_hari[besok]}** (besok): cenderung **{level}**.\n"
+        f"Rata-rata historis: ~{pred['avg_tx']:.0f} transaksi, "
+        f"omzet ~{format_rupiah(pred['avg_omzet'])} per hari serupa.",
+        [*aksi, "forecast_day_of_week"],
+    )

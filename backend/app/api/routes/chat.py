@@ -28,7 +28,7 @@ async def chat(
     await muat_atau_buat_sesi(db, session_id)
     await simpan_pesan(db, session_id, "user", body.pesan)
 
-    hasil = await proses_pesan(db, body.pesan)
+    hasil = await proses_pesan(db, body.pesan, session_id)
 
     await simpan_pesan(
         db,

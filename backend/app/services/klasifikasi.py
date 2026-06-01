@@ -10,11 +10,36 @@ INTENT_LIST = (
     "check_debt",
     "restock_alert",
     "sales_report",
+    "record_sale",
+    "record_payment",
+    "debt_collection",
+    "sales_forecast",
     "unknown",
 )
 
-# Pola berurutan — intent spesifik dulu
+# Pola berurutan — intent spesifik / write dulu
 POLA_INTENT: list[tuple[str, list[str]]] = [
+    # debt_collection sebelum record_payment — hindari match "belum bayar"
+    ("debt_collection", [
+        r"siapa.*belum bayar", r"belum bayar hutang", r"tagih hutang",
+        r"koleksi hutang", r"daftar hutang", r"yang punya hutang",
+        r"siapa.*punya hutang",
+    ]),
+    ("record_payment", [
+        r"(?<!belum )bayar\s+(?:hutang|utang|piutang)",
+        r"lunasi\s+hutang",
+        r"pelunasan\s+hutang",
+    ]),
+    ("record_sale", [
+        r"\bjual\b", r"terjual", r"catat penjualan", r"catat jualan",
+        r"tadi jual",
+    ]),
+    ("sales_forecast", [
+        r"forecast", r"prediksi", r"perkiraan penjualan",
+        r"besok.*(?:ramai|rame|sepi)",
+        r"ramai\s+(?:ga|gak|tidak)?\s*besok",
+        r"kira.kira.*(?:ramai|rame)",
+    ]),
     ("restock_alert", [
         r"mau habis", r"restock", r"perlu restock", r"stok kritis",
         r"produk apa yang", r"barang apa yang",
@@ -24,7 +49,7 @@ POLA_INTENT: list[tuple[str, list[str]]] = [
         r"laporan penjualan", r"berapa jualan", r"total jual",
     ]),
     ("check_debt", [
-        r"hutang", r"piutang", r"utang", r"belum bayar",
+        r"hutang", r"piutang", r"utang", r"belum lunas",
     ]),
     ("check_stock", [
         r"stok", r"stock", r"tinggal berapa", r"ada berapa",
@@ -32,8 +57,6 @@ POLA_INTENT: list[tuple[str, list[str]]] = [
     ]),
 ]
 
-
-# Kata yang bukan nama produk — hasil ekstraksi invalid
 KATA_BUKAN_PRODUK = frozenset({
     "berapa", "sisa", "tinggal", "ada", "masih", "min", "max",
 })
@@ -65,8 +88,10 @@ def ekstrak_nama_produk(pesan: str) -> Optional[str]:
 
 
 def ekstrak_nama_customer(pesan: str) -> Optional[str]:
-    """Ambil nama customer setelah kata hutang."""
+    """Ambil nama customer setelah kata hutang (untuk check_debt)."""
     teks = normalisasi_teks(pesan)
+    if re.search(r"bayar\s+(?:hutang|utang)", teks):
+        return None
     m = re.search(r"hutang\s+(.+?)(?:\?|$|total|berapa)", teks)
     if m:
         return m.group(1).strip()

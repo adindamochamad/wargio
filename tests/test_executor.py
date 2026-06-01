@@ -13,14 +13,16 @@ async def test_retry_satu_kali_lalu_sukses() -> None:
     db = AsyncMock()
     panggilan = {"n": 0}
 
-    async def handler_gagal_lalu_ok(db_arg, intent, pesan):
+    async def handler_gagal_lalu_ok(db_arg, intent, pesan, session_id):
         panggilan["n"] += 1
         if panggilan["n"] == 1:
             raise ConnectionError("Atlas timeout simulasi")
         return "OK retry", ["mcp:find"]
 
     with patch("app.services.executor._jalankan_intent", side_effect=handler_gagal_lalu_ok):
-        balasan, aksi = await jalankan_dengan_retry(db, "check_stock", "stok indomie")
+        balasan, aksi = await jalankan_dengan_retry(
+            db, "check_stock", "stok indomie", "test-retry"
+        )
 
     assert balasan == "OK retry"
     assert panggilan["n"] == 2
@@ -30,12 +32,13 @@ async def test_retry_satu_kali_lalu_sukses() -> None:
 async def test_retry_gagal_total() -> None:
     """Setelah 2 percobaan, error naik ke proses_pesan."""
     db = AsyncMock()
+    db.agent_sessions.find_one = AsyncMock(return_value=None)
 
-    async def selalu_gagal(db_arg, intent, pesan):
+    async def selalu_gagal(db_arg, intent, pesan, session_id):
         raise RuntimeError("Atlas down")
 
     with patch("app.services.executor._jalankan_intent", side_effect=selalu_gagal):
-        hasil = await proses_pesan(db, "stok indomie berapa?")
+        hasil = await proses_pesan(db, "stok indomie berapa?", "test-error")
 
     assert "gangguan teknis" in hasil["balasan"].lower()
     assert "error_atlas" in hasil["actions_taken"]

@@ -102,5 +102,59 @@ def parse_hasil_mcp_aggregate(teks: str) -> list[dict[str, Any]]:
         return []
 
 
-# Re-export untuk mcp_klien
-__all__ = ["mcp_find", "mcp_aggregate", "parse_hasil_mcp_aggregate", "_convert_oid"]
+async def mcp_insert_one(
+    db: AsyncDatabase,
+    collection: str,
+    dokumen: dict[str, Any],
+    *,
+    session: Any = None,
+) -> tuple[Any, list[str]]:
+    """Insert satu dokumen — MCP live + PyMongo (data aktual)."""
+    aksi = ["mcp:insertOne"]
+    pengaturan = ambil_pengaturan()
+    # MCP live di luar transaksi atomik — hindari double-write
+    if pengaturan.mcp_live_enabled and session is None:
+        try:
+            from app.services.mcp_klien import panggil_mcp_insert_one
+
+            await panggil_mcp_insert_one(collection, dokumen)
+            aksi.append("mcp:insertOne:live")
+        except Exception:
+            aksi.append("mcp:insertOne:live_fallback")
+
+    hasil = await db[collection].insert_one(dokumen, session=session)
+    return hasil.inserted_id, aksi
+
+
+async def mcp_update_one(
+    db: AsyncDatabase,
+    collection: str,
+    filter_query: dict[str, Any],
+    update: dict[str, Any],
+    *,
+    session: Any = None,
+) -> tuple[int, list[str]]:
+    """Update satu dokumen — MCP live + PyMongo. Return modified_count."""
+    aksi = ["mcp:updateOne"]
+    pengaturan = ambil_pengaturan()
+    if pengaturan.mcp_live_enabled and session is None:
+        try:
+            from app.services.mcp_klien import panggil_mcp_update_one
+
+            await panggil_mcp_update_one(collection, filter_query, update)
+            aksi.append("mcp:updateOne:live")
+        except Exception:
+            aksi.append("mcp:updateOne:live_fallback")
+
+    hasil = await db[collection].update_one(filter_query, update, session=session)
+    return hasil.modified_count, aksi
+
+
+__all__ = [
+    "mcp_find",
+    "mcp_aggregate",
+    "mcp_insert_one",
+    "mcp_update_one",
+    "parse_hasil_mcp_aggregate",
+    "_convert_oid",
+]
