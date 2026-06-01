@@ -1,0 +1,28 @@
+---
+description: Timeline 8 hari hackathon Wargio (deadline 11 Juni 2026)
+alwaysApply: true
+---
+
+# Wargio — Timeline 8 Hari
+
+Deadline: **11 Juni 2026**. Submit paling lambat **10 Juni** (1 hari buffer).
+
+| Hari | Tanggal | Target |
+|---|---|---|
+| 1 | 1 Juni | Atlas + MCP connected, seed data, FastAPI structure, MIT license |
+| 2 | 2 Juni | Agent Builder + 4 intent (check_stock, check_debt, sales_report, restock_alert) |
+| 3 | 3 Juni | Write intents (record_sale, record_payment, debt_collection, sales_forecast) |
+| 4 | 4 Juni | Next.js chat UI, dashboard mini, mobile-responsive, dark mode |
+| 5 | 5 Juni | Deploy Cloud Run + Vercel, load test, README lengkap |
+| 6 | 6 Juni | Testing blitz — 80% coverage, semua edge case |
+| 7 | 7 Juni | Demo video 3 menit (1080p, subtitle EN, Atlas dashboard visible) |
+| 8 | 8-11 Juni | Final polish, Devpost submit |
+
+## Definition of Done Kritis
+
+**Hari 1:** MCP query products dengan stock < 10 return data
+**Hari 2:** 4 curl chat queries return respons masuk akal
+**Hari 3:** record_sale → stock berkurang → transaction di Atlas
+**Hari 5:** Production URL health OK, response < 5 detik, 10 concurrent users
+
+Prioritaskan task hari ini sebelum fitur nice-to-have.

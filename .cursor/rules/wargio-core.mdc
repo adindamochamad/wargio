@@ -1,0 +1,67 @@
+---
+description: Identitas, tech stack, dan red lines project Wargio
+alwaysApply: true
+---
+
+# Wargio — Core Project Rules
+
+> Baca sebelum menulis satu baris pun. Aturan ini adalah hukum tertinggi project.
+
+## Identitas
+
+| Field | Value |
+|---|---|
+| Nama | **Wargio** |
+| Tagline | *AI agent for Indonesia's 64 million micro-retailers* |
+| Track | MongoDB — Google Cloud Rapid Agent Hackathon 2026 |
+| Deadline | **11 Juni 2026, 14:00 PDT** |
+| Repository | Public, open-source license wajib di root |
+| Demo video | ~3 menit, harus ada footage agent berjalan live |
+
+## Problem Statement
+
+64 juta UMKM/warung di Indonesia mengelola bisnis manual (buku hutang, ingatan stok). Wargio adalah AI agent asisten warung — ditanya bahasa natural, multi-step reasoning terhadap data nyata MongoDB Atlas, memberikan aksi konkret bukan sekadar jawaban.
+
+## Tech Stack — WAJIB
+
+```
+Core Agent: Google Cloud Agent Builder, Gemini 3, MongoDB Atlas, MongoDB MCP Server
+Backend: Python 3.11+, FastAPI, PyMongo Async, Pydantic v2
+Frontend: Next.js 14+ (App Router), TypeScript strict, Tailwind, shadcn/ui
+Infra: Cloud Run (API), Atlas M0, Vercel (frontend)
+Testing: pytest + pytest-asyncio, Vitest + Testing Library, k6
+```
+
+## LARANGAN KERAS
+
+- ❌ LangChain / LangGraph — gunakan Google-native stack
+- ❌ OpenAI API — Gemini wajib
+- ❌ Mock MongoDB dengan SQLite — Atlas harus live
+- ❌ Hardcode data — semua dari Atlas via MCP
+
+## Red Lines (Diskualifikasi)
+
+1. Hardcoded credentials di repo
+2. Agent tidak terhubung ke Atlas live
+3. Video > 3 menit
+4. Repo tidak public saat deadline
+5. Tidak ada open source license
+6. MCP tidak digunakan secara meaningful
+7. Agent hanya Q&A tanpa write operations
+8. Mock data di demo tanpa Atlas
+
+## Git Commit Format
+
+```
+<type>(<scope>): <description>
+type: feat | fix | test | docs | refactor | perf
+scope: agent | api | frontend | db | infra | test
+```
+
+### Authorship (Wajib)
+
+- Satu author saja — pemilik repo. **Tanpa** `Co-authored-by` atau author lain.
+- Jangan ubah `git config user.name` / `user.email`.
+- Detail: `.cursor/rules/wargio-git.mdc`
+
+Referensi lengkap: `.cursorules.md`

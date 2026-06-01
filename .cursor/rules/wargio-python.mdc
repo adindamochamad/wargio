@@ -1,0 +1,39 @@
+---
+description: Standar kode Python backend Wargio
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Wargio — Python Standards
+
+```python
+from __future__ import annotations
+from typing import Any
+```
+
+## Wajib
+
+- Type hints di setiap function
+- Docstring di setiap public function (Args, Returns, Raises)
+- Proper error handling — tidak boleh bare `except`
+- PyMongo Async (`AsyncMongoClient`) untuk async MongoDB, Pydantic v2 untuk validation
+
+## Contoh Error Handling
+
+```python
+try:
+    result = await mcp_client.query(...)
+except MCPTimeoutError:
+    logger.error("MCP timeout", extra={"query": query})
+    raise AgentToolError("Database temporarily unavailable")
+except MCPError as e:
+    logger.error("MCP error", extra={"error": str(e)})
+    raise
+```
+
+## Backend Endpoints Wajib
+
+- `POST /api/chat` — chat dengan agent
+- `GET /api/health` — health check
+
+Rate limiting: max 30 req/min per session. Semua secret di Secret Manager, bukan repo.

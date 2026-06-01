@@ -1,0 +1,46 @@
+---
+description: Mapping intent ke MCP tool, fuzzy matching, auth MVP, prioritas fitur
+alwaysApply: true
+---
+
+# Wargio — Keputusan Konsep (Gap Resolved)
+
+Detail lengkap: `.cursorules.md` Section 6A–6D
+
+## Intent → MCP → Collection
+
+| Intent | Tier | MCP (urutan) | Collection | Write |
+|---|---|---|---|---|
+| check_stock | 1 | find | products | ❌ |
+| check_debt | 1 | find | customers | ❌ |
+| restock_alert | 1 | find + sort | products | ❌ |
+| sales_report | 1 | aggregate | transactions | ❌ |
+| record_sale | 1 | find → insertOne → updateOne | products, transactions | ✅ |
+| record_payment | 1 | find → updateOne → insertOne | customers, transactions | ✅ |
+| debt_collection | 2 | find + filter + sort | customers | ❌ |
+| sales_forecast | 2 | aggregate (dayOfWeek avg) | transactions | ❌ |
+
+Write intent WAJIB konfirmasi user sebelum MCP insert/update.
+
+## Fuzzy Matching Produk
+
+1. Normalisasi input (lowercase, hapus filler)
+2. Exact alias match → 1 hit = resolve
+3. Partial regex/Atlas Search → score ≥ 0.8 = resolve
+4. Vector search (Gemini embed 768d) → score ≥ 0.85 = resolve
+5. Ambigu (gap < 0.15) → tampilkan max 3 opsi ke user
+
+Customer: regex name, disambiguasi jika 2+ match.
+
+## Auth MVP
+
+- Single-tenant, satu warung demo, no login
+- `X-Session-Id` UUID di header, persist `agent_sessions`
+- Optional `X-API-Key` untuk rate limit production
+- Multi-warung = future work, jangan implementasi hackathon
+
+## Prioritas
+
+- **Tier 1 (blocker):** 6 intent read+write di atas minus debt_collection & sales_forecast
+- **Tier 2 (complete):** debt_collection, sales_forecast (day-of-week avg, bukan ML)
+- **Tier 3 (stretch):** promo_suggestion, voice input, dashboard mini

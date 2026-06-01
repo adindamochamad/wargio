@@ -1,0 +1,66 @@
+---
+description: Arsitektur, MongoDB schema, dan agent intents Wargio
+alwaysApply: true
+---
+
+# Wargio — Arsitektur & Data
+
+## Alur Sistem
+
+```
+User (Bahasa Indonesia) → Next.js Frontend → POST /api/chat
+→ FastAPI (Cloud Run) → Google Cloud Agent Builder (Gemini 3)
+→ MongoDB MCP Server → Atlas (find/aggregate/insertOne/updateOne)
+→ Action Engine (restock_alert, debt_summary — post-processing)
+```
+
+## Intent → MCP Mapping
+
+Lihat `wargio-intent-mapping.mdc` dan `.cursorules.md` Section 6A.
+
+Write intents (`record_sale`, `record_payment`): konfirmasi user → insertOne/updateOne.
+Read intents: find atau aggregate saja.
+
+## Fuzzy Matching
+
+Pipeline: exact alias → partial text (score ≥0.8) → vector search Gemini 768d (score ≥0.85) → disambiguasi max 3 opsi.
+Detail: Section 6B `.cursorules.md`.
+
+## Auth MVP
+
+Single warung demo, no login. Session via `X-Session-Id` UUID. Multi-warung out of scope.
+
+## MongoDB Collections
+
+Ikuti schema persis di `.cursorules.md` Section 5:
+
+- `products` — sku, name, name_aliases, category, price_buy/sell, stock_current/minimum, unit, supplier
+- `transactions` — type (sale|restock|adjustment), items[], total, payment_method, customer_id
+- `customers` — name, phone, debt_total, debt_history[]
+- `agent_sessions` — session_id, messages[], context
+
+**Vector Search Index wajib** di Atlas untuk fuzzy product matching (768 dimensions, cosine).
+
+## 8 Intent Wajib
+
+| Intent | Contoh Query |
+|---|---|
+| `check_stock` | "Stok mie instan berapa?" |
+| `check_debt` | "Hutang Bu Sari berberapa?" |
+| `record_sale` | "Tadi jual 3 aqua sama 2 rokok sampoerna" |
+| `sales_report` | "Berapa pendapatan hari ini?" |
+| `restock_alert` | "Produk apa yang mau habis?" |
+| `debt_collection` | "Siapa yang belum bayar hutang minggu ini?" |
+| `record_payment` | "Bu Sari bayar hutang 50 ribu" |
+| `sales_forecast` | "Kira-kira besok bakal ramai?" |
+
+**Tier 1 (blocker):** check_stock, check_debt, restock_alert, sales_report, record_sale, record_payment
+**Tier 2 (complete):** debt_collection, sales_forecast
+**Tier 3 (stretch):** promo_suggestion
+
+## Design Frontend
+
+- Warna primer: hijau tua `#16a34a`
+- Font: Inter
+- Format Rupiah: `Rp 12.500`
+- Bahasa Indonesia default, mobile-responsive, dark mode

@@ -1,0 +1,39 @@
+---
+description: Standar testing Wargio — coverage dan struktur test
+globs: "**/tests/**,**/*.test.{py,ts,tsx},**/*.spec.{ts,tsx}"
+alwaysApply: false
+---
+
+# Wargio — Testing Standards
+
+## Coverage Minimum
+
+```
+Backend total: ≥ 80% (API routes 100%, intent handlers 90%, MCP 80%)
+Frontend total: ≥ 70% (Chat component 90%, API calls 85%)
+```
+
+## Struktur Test
+
+```
+tests/
+├── unit/          — test per intent (min 5-10 cases each) + fuzzy_matching + schema
+├── integration/   — mcp_connection, full_sale_flow, debt_lifecycle, agent_session
+└── e2e/           — chat_api, production_url smoke tests
+```
+
+## Setiap Intent Wajib Punya
+
+- Happy path test
+- Min 2 edge case test
+- Min 1 error case test
+
+## Hari 6 Stress Test (Wajib Pass)
+
+- Nama produk tidak lengkap → konfirmasi
+- Capslock, fuzzy match, input kosong, multi-intent
+- Qty 0/negatif → reject
+- Stok 0 + penjualan → reject + suggest restock
+- Customer nama mirip → disambiguasi
+- MCP down → fallback message, tidak crash
+- 2 sesi berbeda → tidak cross-contaminate

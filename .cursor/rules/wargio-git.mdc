@@ -1,0 +1,43 @@
+---
+description: Aturan git commit dan push — satu author saja, tanpa co-author
+alwaysApply: true
+---
+
+# Wargio — Git & Authorship
+
+## Aturan Wajib
+
+- **Hanya satu author** di setiap commit — pemilik repo (user GitHub yang push).
+- **JANGAN** tambahkan `Co-authored-by:` di commit message.
+- **JANGAN** tambahkan trailer author/committer lain (Cursor, Copilot, bot, AI assistant, dll).
+- **JANGAN** ubah `git config user.name` atau `user.email` ke identitas selain pemilik repo.
+- Commit message cukup format standar Wargio — tanpa footer co-author.
+
+## Format Commit
+
+```
+<type>(<scope>): <description>
+```
+
+Contoh valid:
+```
+feat(api): tambah endpoint health check
+```
+
+Contoh **dilarang**:
+```
+feat(api): tambah endpoint health check
+
+Co-authored-by: Cursor <cursor@cursor.com>
+Co-authored-by: GitHub Copilot <copilot@github.com>
+```
+
+## Sebelum Push
+
+1. Cek author commit terakhir: `git log -1 --format='%an <%ae>'`
+2. Pastikan hanya identitas pemilik repo yang muncul.
+3. Jika ada `Co-authored-by`, amend/rebase commit tersebut sebelum push (hanya jika commit belum di-push).
+
+## Contributors GitHub
+
+History dan daftar contributor repo harus mencerminkan **pemilik repo saja**. Agent/AI hangan muncul sebagai co-author atau contributor.

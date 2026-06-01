@@ -1,0 +1,11 @@
+{
+  "name": "wargio",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verifikasi:mcp": "node scripts/verifikasi_mcp.mjs"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

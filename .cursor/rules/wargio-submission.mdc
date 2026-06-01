@@ -1,0 +1,33 @@
+---
+description: Checklist submission hackathon — README, Devpost, demo video
+alwaysApply: false
+---
+
+# Wargio — Submission Checklist
+
+## README.md Wajib Ada
+
+What is Wargio, Demo (YouTube), Live App URL, Architecture, Tech Stack (dengan versi), MongoDB Integration, Google Cloud Integration, Local Development, Environment Variables (tanpa nilai asli), Running Tests, MIT License.
+
+## Demo Video (2:45–3:00 menit)
+
+1. Hook problem warung Indonesia
+2. Stock check natural language + Atlas dashboard split screen
+3. Record sale multi-step agent
+4. Debt management + payment
+5. Business intelligence (top products)
+6. Architecture slide (Gemini + Agent Builder + MCP + Atlas)
+7. Closing "Wargio — AI agent for Indonesia's 64 million micro-retailers"
+
+Resolusi 1080p, subtitle Bahasa Inggris, upload YouTube.
+
+## Pre-Submit Checklist
+
+- Live URL incognito accessible, /api/health 200
+- Semua 8 intent di production, Atlas live (bukan mock)
+- No credentials in repo (cek git history)
+- pytest pass ≥ 80% coverage, no TODO/FIXME
+- Repo public + MIT LICENSE
+- Devpost: track MongoDB, tags MongoDB/Google Cloud/Gemini/Python/Next.js/MCP
+
+Detail lengkap: `.cursorules.md` Section 9-13

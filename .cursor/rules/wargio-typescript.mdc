@@ -1,0 +1,23 @@
+---
+description: Standar kode TypeScript frontend Wargio
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Wargio — TypeScript Standards
+
+## Wajib
+
+- `"strict": true` di tsconfig — tidak ada pengecualian
+- **No `any`** — gunakan typed interfaces (e.g. `ChatResponse`)
+- Error boundary di setiap halaman React
+- Loading state di setiap async operation — UI tidak boleh freeze
+- Streaming response — loading spinner diam max 2 detik
+
+## UX Requirements
+
+- Mobile-responsive (demo dari HP)
+- Dark mode support
+- Quick actions: "Cek Stok", "Lihat Hutang", "Laporan Hari Ini"
+- Loading skeleton, bukan spinner polos
+- Empty state informatif — tidak ada Lorem Ipsum

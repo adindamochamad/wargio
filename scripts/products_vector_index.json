@@ -1,0 +1,24 @@
+{
+  "name": "products_vector_index",
+  "database": "wargio_demo",
+  "collectionName": "products",
+  "type": "vectorSearch",
+  "definition": {
+    "fields": [
+      {
+        "type": "vector",
+        "path": "name",
+        "numDimensions": 768,
+        "similarity": "cosine"
+      },
+      {
+        "type": "filter",
+        "path": "category"
+      },
+      {
+        "type": "filter",
+        "path": "name_aliases"
+      }
+    ]
+  }
+}
