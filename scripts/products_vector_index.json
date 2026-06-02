@@ -7,7 +7,7 @@
     "fields": [
       {
         "type": "vector",
-        "path": "name",
+        "path": "name_embedding",
         "numDimensions": 768,
         "similarity": "cosine"
       },

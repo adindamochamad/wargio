@@ -1,6 +1,7 @@
 """Test intent Hari 3 — write + tier 2."""
 
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -18,6 +19,27 @@ pytestmark = pytest.mark.skipif(
     not ambil_pengaturan().atlas_terkonfigurasi,
     reason="MONGODB_URI belum dikonfigurasi",
 )
+
+# Produk uji penjualan — stok di-reset agar test tidak gagal setelah run sebelumnya
+SKU_PRODUK_UJI = "MKN-INDO-GORENG"
+STOK_UJI = 50
+
+
+@pytest.fixture(autouse=True)
+async def siapkan_stok_produk_uji() -> None:
+    """Pastikan Indomie Goreng punya stok cukup untuk skenario record_sale."""
+    from app.db.koneksi import dapatkan_database
+
+    db = await dapatkan_database()
+    await db.products.update_one(
+        {"sku": SKU_PRODUK_UJI},
+        {
+            "$set": {
+                "stock_current": STOK_UJI,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
+    )
 
 
 def test_klasifikasi_record_sale() -> None:

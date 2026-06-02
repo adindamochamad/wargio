@@ -24,7 +24,7 @@ Fokus utama: selesaikan Tier 1 lebih dulu, lalu Tier 2, baru polish.
 - [x] Tambah `.env.example` tanpa nilai rahasia.
 - [x] Setup koneksi Atlas pakai `AsyncMongoClient`.
 - [x] Buat collections: `products`, `transactions`, `customers`, `agent_sessions`.
-- [x] Buat index dasar + vector index produk (768 dimensi) *(index dasar OK; vector index manual di Atlas UI)*.
+- [x] Buat index dasar + vector index produk (768 dimensi) — `scripts/buat_vector_index.py`.
 - [x] Seed data expanded (52 produk, 20 customer, 239 transaksi).
 - [x] Setup MongoDB MCP server + verifikasi `find` (`npm run verifikasi:mcp`).
 
@@ -32,11 +32,11 @@ Fokus utama: selesaikan Tier 1 lebih dulu, lalu Tier 2, baru polish.
 - [x] Query MCP `find` stok rendah berhasil (15 docs).
 - [x] Endpoint `/api/health` return 200 + `atlas=true`.
 
-### Catatan partial (1 Juni)
+### Catatan partial (1 Juni) — selesai
 - [x] MCP verified — `scripts/verifikasi_mcp.mjs`
 - [x] `0.0.0.0/0` dihapus dari Network Access
-- [ ] Vector index — M0 max 1/cluster (buat manual Atlas UI)
-- [ ] Push GitHub public (butuh `git remote add origin ...`)
+- [x] Vector index `products_vector_index` READY (768d, `name_embedding`)
+- [x] Repo public & ter-push — `https://github.com/adindamochamad/wargio`
 
 ### Verifikasi lokal
 
@@ -88,40 +88,85 @@ Lolos penuh Hari 1 hanya jika semua gate hijau (termasuk Atlas + seed).
 - [x] `stock_current` berkurang sesuai qty.
 - [x] Tidak ada write tanpa konfirmasi.
 
+### Verifikasi lokal
+
+```bash
+backend/.venv/bin/python scripts/verifikasi_hari3.py
+# atau: npm run verifikasi:hari3
+```
+
+Lolos penuh Hari 3 jika semua gate hijau (termasuk `pytest tests/test_hari3.py`).
+
 ## Hari 4 — Frontend MVP
 
 ### Target Hari Ini
 - UI demo-ready untuk alur utama.
 
 ### Todo
-- [ ] Scaffold Next.js App Router + TypeScript strict + Tailwind.
-- [ ] Buat halaman chat utama.
-- [ ] Integrasi `POST /api/chat`.
-- [ ] Tambah quick actions: Cek Stok, Lihat Hutang, Laporan Hari Ini.
-- [ ] Tambah mini dashboard: stok kritis, ringkasan hutang, transaksi hari ini.
-- [ ] Mobile responsive + dark mode.
-- [ ] Loading state dan error state yang jelas.
+- [x] Scaffold Next.js App Router + TypeScript strict + Tailwind.
+- [x] Buat halaman chat utama.
+- [x] Integrasi `POST /api/chat`.
+- [x] Tambah quick actions: Cek Stok, Lihat Hutang, Laporan Hari Ini.
+- [x] Tambah mini dashboard: stok kritis, ringkasan hutang, transaksi hari ini.
+- [x] Mobile responsive + dark mode.
+- [x] Loading state dan error state yang jelas.
 
 ### Definition of Done
-- [ ] Dari UI, user bisa menjalankan minimal 4 intent Tier 1 tanpa error kritis.
+- [x] Dari UI, user bisa menjalankan minimal 4 intent Tier 1 tanpa error kritis.
 
-## Hari 5 — Deploy & Production Validation
+### Verifikasi lokal
+
+```bash
+# Terminal 1 — API
+cd backend && uvicorn app.main:aplikasi --reload --port 8000
+
+# Terminal 2 — UI (salin frontend/.env.example → frontend/.env.local)
+cd frontend && npm run dev
+
+backend/.venv/bin/python scripts/verifikasi_hari4.py
+# atau: npm run verifikasi:hari4
+# Gate: build, vitest, runtime /api/dashboard + 4 intent + CORS
+```
+
+### Mitigasi risiko (Hari 4)
+- [x] Parsing error FastAPI `detail` array di `api.ts`
+- [x] Banner API mati + pesan restart backend
+- [x] Tema tanpa flash (inline script + provider)
+- [x] Timeout chat 90s + pesan MCP lambat
+- [x] `MCP_LIVE_ENABLED=false` default di `.env.example`
+- [x] `verifikasi_hari4` uji runtime + vitest frontend
+
+## Hari 5 — Deploy & Production Validation (VPS)
 
 ### Target Hari Ini
-- Aplikasi live dan bisa diuji judge.
+- Aplikasi live HTTPS di VPS dan bisa diuji judge.
 
 ### Todo
-- [ ] Deploy backend ke Cloud Run.
-- [ ] Deploy frontend ke Vercel.
-- [ ] Setup CORS whitelist domain frontend.
-- [ ] Setup rate limiting per sesi.
-- [ ] Verifikasi secret tidak hardcoded.
-- [ ] Jalankan smoke test production.
-- [ ] Lengkapi README (arsitektur, setup lokal, env vars, test command).
+- [x] Artifact deploy VPS (Docker, Nginx, `docs/deploy-vps.md`).
+- [x] Rate limiting per sesi (`MiddlewareRateLimit`).
+- [x] Template `deploy/.env.production.example` (tanpa rahasia di git).
+- [x] Smoke test `scripts/smoke_production.sh`.
+- [x] Verifikasi `scripts/verifikasi_hari5.py`.
+- [ ] Deploy di VPS Anda (`scripts/deploy_vps.sh`).
+- [ ] Nginx + SSL (Let's Encrypt).
+- [ ] Atlas Network Access: allowlist IP VPS.
+- [ ] Isi Live URL di README & Devpost.
+- [ ] Smoke production: `WARGIO_PRODUCTION_URL=... bash scripts/smoke_production.sh`.
+- [ ] (Opsional) k6 10 user — catat p95 di docs.
 
 ### Definition of Done
-- [ ] URL production bisa diakses incognito.
-- [ ] p95 response time < 5 detik untuk 10 concurrent users (uji awal).
+- [ ] URL production HTTPS bisa diakses incognito (`/api/health` 200, `atlas=true`).
+- [ ] UI + 4 intent Tier 1 jalan di domain production.
+- [ ] p95 response time < 5 detik untuk 10 concurrent users (uji awal, opsional).
+
+### Verifikasi
+
+```bash
+backend/.venv/bin/python scripts/verifikasi_hari5.py
+# Setelah deploy:
+export WARGIO_PRODUCTION_URL=https://domain-anda.com
+bash scripts/smoke_production.sh
+```
 
 ## Hari 6 — Testing Blitz & Hardening
 

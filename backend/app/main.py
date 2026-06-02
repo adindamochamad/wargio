@@ -33,13 +33,29 @@ aplikasi = FastAPI(
     lifespan=siklus_hidup,
 )
 
+def _daftar_asal_cors() -> list[str]:
+    asal = [
+        a.strip()
+        for a in ambil_pengaturan().cors_origins.split(",")
+        if a.strip()
+    ]
+    return asal or ["http://localhost:3000"]
+
+
 aplikasi.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_daftar_asal_cors(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+from app.middleware.rate_limit import MiddlewareRateLimit  # noqa: E402
+
+aplikasi.add_middleware(MiddlewareRateLimit)
+
+from app.api.routes import dashboard  # noqa: E402
+
 aplikasi.include_router(health.router)
 aplikasi.include_router(chat.router)
+aplikasi.include_router(dashboard.router)

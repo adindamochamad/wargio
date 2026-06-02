@@ -56,7 +56,7 @@ async def buat_indeks() -> None:
 
     await klien.close()
     print("OK: Index dasar berhasil dibuat.")
-    print("MANUAL: Buat Vector Search index di Atlas UI — lihat docs/setup-atlas-mcp.md")
+    print("Lanjut: python scripts/buat_vector_index.py")
 
 
 if __name__ == "__main__":

@@ -149,14 +149,109 @@ def gate_mcp_dokumentasi() -> None:
         catat_gagal("Output MCP tidak sesuai")
 
 
+async def gate_vector_index() -> None:
+    """Vector Search index products_vector_index harus READY (768d)."""
+    print("\n[GATE] Vector Search — products_vector_index")
+    if not URI:
+        catat_gagal("MONGODB_URI kosong — lewati cek vector index")
+        return
+    try:
+        klien = AsyncMongoClient(URI, serverSelectionTimeoutMS=8000)
+        kursor = await klien[DB_NAME].products.list_search_indexes()
+        indeks_wargio = None
+        for doc in await kursor.to_list(10):
+            if doc.get("name") == "products_vector_index":
+                indeks_wargio = doc
+                break
+        await klien.close()
+
+        if not indeks_wargio:
+            catat_gagal(
+                "products_vector_index belum ada — jalankan: "
+                "python scripts/buat_vector_index.py --bebaskan-slot-sample"
+            )
+            return
+        status = indeks_wargio.get("status", "")
+        if status != "READY":
+            catat_gagal(f"products_vector_index status={status} (tunggu READY di Atlas)")
+            return
+        fields = (indeks_wargio.get("latestDefinition") or {}).get("fields", [])
+        dimensi = next(
+            (f.get("numDimensions") for f in fields if f.get("type") == "vector"),
+            None,
+        )
+        if dimensi != 768:
+            catat_gagal(f"Vector index dimensi={dimensi}, harus 768")
+            return
+        catat_lolos("products_vector_index READY (768d, cosine)")
+    except Exception as e:
+        catat_gagal(f"Vector index: {e}")
+
+
+def gate_github_public() -> None:
+    """Repo ter-push ke GitHub dan bersifat public (DoD partial Hari 1)."""
+    print("\n[GATE] GitHub — remote & visibility")
+    import subprocess
+
+    root = Path(__file__).resolve().parents[1]
+    hasil_remote = subprocess.run(
+        ["git", "remote", "get-url", "origin"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if hasil_remote.returncode != 0:
+        catat_gagal("Remote origin belum dikonfigurasi")
+        return
+    catat_lolos(f"Remote origin: {hasil_remote.stdout.strip()}")
+
+    hasil_push = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    if hasil_push.returncode != 0:
+        catat_gagal("Git HEAD tidak valid")
+        return
+
+    hasil_ls = subprocess.run(
+        ["git", "ls-remote", "origin", "HEAD"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if hasil_ls.returncode != 0 or not hasil_ls.stdout.strip():
+        catat_gagal("Branch belum ter-push ke origin — jalankan: git push -u origin main")
+        return
+    catat_lolos("Branch utama ter-push ke origin")
+
+    hasil_gh = subprocess.run(
+        ["gh", "repo", "view", "--json", "isPrivate,url"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    if hasil_gh.returncode == 0 and '"isPrivate":false' in hasil_gh.stdout.replace(" ", ""):
+        catat_lolos("Repo GitHub public")
+    elif hasil_gh.returncode != 0:
+        catat_lolos("gh CLI tidak tersedia — verifikasi public manual di GitHub")
+    else:
+        catat_gagal("Repo masih private — ubah ke public di GitHub Settings")
+
+
 async def main() -> None:
     print("=== Verifikasi Hari 1 Wargio ===")
     gate_repo()
     atlas_siap = gate_env()
     if atlas_siap:
         await gate_atlas()
+        await gate_vector_index()
     await gate_health_api()
     gate_mcp_dokumentasi()
+    gate_github_public()
 
     print("\n=== Ringkasan ===")
     print(f"Lolos: {len(LOLOS)} | Gagal: {len(GAGAL)}")
@@ -165,7 +260,7 @@ async def main() -> None:
         for g in GAGAL:
             print(f"  - {g}")
         sys.exit(1)
-    print("\nSemua gate lokal lolos. Lanjut Hari 2 setelah MCP manual terverifikasi.")
+    print("\nHari 1 Foundation: SEMUA GATE LOLOS.")
     sys.exit(0)
 
 

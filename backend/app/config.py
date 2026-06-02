@@ -19,6 +19,8 @@ class Pengaturan(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     rate_limit_per_minute: int = 30
+    # CORS — koma-terpisah, contoh: http://localhost:3000,https://wargio.vercel.app
+    cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     # Google Cloud / Gemini (Hari 2+)
     google_cloud_project: str = ""

@@ -20,28 +20,21 @@ python scripts/seed_data.py
 python scripts/verifikasi_hari1.py
 ```
 
-## 3. Vector Search Index (manual di Atlas UI)
+## 3. Vector Search Index (768d)
 
-Search index name: `products_vector_index`  
-Collection: `products`
+Nama index: `products_vector_index` pada collection `products`, field vector: `name_embedding`.
 
-```json
-{
-  "mappings": {
-    "dynamic": false,
-    "fields": {
-      "name": [
-        { "type": "string" },
-        { "type": "vector", "dimensions": 768, "similarity": "cosine" }
-      ],
-      "name_aliases": [{ "type": "string" }],
-      "category": [{ "type": "string" }]
-    }
-  }
-}
+```bash
+python scripts/buat_vector_index.py
+# Jika cluster M0 penuh (indeks proyek lain):
+python scripts/buat_vector_index.py --bebaskan-slot-sample
 ```
 
-Embedding diisi saat pipeline fuzzy match (Hari 3). Hari 1 cukup index dibuat.
+Definisi JSON untuk Atlas CLI: `scripts/products_vector_index.json`.
+
+> **M0:** Satu slot FTS per cluster. Opsi `--bebaskan-slot-sample` hanya menghapus indeks bawaan `sample_mflix.movies/default`, bukan data Wargio.
+
+Embedding `name_embedding` diisi saat pipeline fuzzy match (Hari 2+). Hari 1 cukup index status **READY**.
 
 ## 4. MongoDB MCP Server
 

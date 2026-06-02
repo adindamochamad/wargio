@@ -1,0 +1,185 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { kirimChat, KesalahanApi } from "@/lib/api";
+import { ambilIdSesi, resetIdSesi, simpanIdSesi } from "@/lib/sesi";
+import type { PesanUi } from "@/types/chat";
+import { AksiCepat } from "./aksi-cepat";
+import { PesanChat } from "./pesan-chat";
+
+const PESAN_SELAMAT_DATANG: PesanUi = {
+  id: "selamat-datang",
+  peran: "assistant",
+  isi:
+    "Halo, Bu/Pak! Saya Wargio — siap bantu cek stok, hutang, dan catat penjualan. " +
+    "Tanya apa saja dalam Bahasa Indonesia, atau pakai tombol cepat di bawah.",
+};
+
+export function ChatWargio({
+  onTransaksiSelesai,
+}: {
+  onTransaksiSelesai?: () => void;
+}) {
+  const [pesanDaftar, setPesanDaftar] = useState<PesanUi[]>([PESAN_SELAMAT_DATANG]);
+  const [inputTeks, setInputTeks] = useState("");
+  const [sedangKirim, setSedangKirim] = useState(false);
+  const [pesanError, setPesanError] = useState<string | null>(null);
+  const [idSesi, setIdSesi] = useState(() =>
+    typeof window !== "undefined" ? ambilIdSesi() : "",
+  );
+  const bawahRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bawahRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [pesanDaftar, sedangKirim]);
+
+  const kirimPesan = useCallback(
+    async (teks: string) => {
+      const pesanBersih = teks.trim();
+      if (!pesanBersih || sedangKirim) {
+        return;
+      }
+
+      setPesanError(null);
+      setSedangKirim(true);
+
+      const idUser = `u-${Date.now()}`;
+      const idAsisten = `a-${Date.now()}`;
+
+      setPesanDaftar((sebelum) => [
+        ...sebelum,
+        { id: idUser, peran: "user", isi: pesanBersih },
+        { id: idAsisten, peran: "assistant", isi: "", sedangStreaming: true },
+      ]);
+      setInputTeks("");
+
+      try {
+        const sesi = idSesi || ambilIdSesi();
+        const res = await kirimChat(pesanBersih, sesi);
+        if (res.session_id) {
+          simpanIdSesi(res.session_id);
+          setIdSesi(res.session_id);
+        }
+
+        setPesanDaftar((sebelum) =>
+          sebelum.map((p) =>
+            p.id === idAsisten
+              ? {
+                  ...p,
+                  isi: res.balasan,
+                  intent: res.intent,
+                  sedangStreaming: false,
+                }
+              : p,
+          ),
+        );
+
+        const intentWrite =
+          res.intent === "record_sale" || res.intent === "record_payment";
+        const suksesWrite =
+          res.balasan.toLowerCase().includes("berhasil dicatat");
+        if (intentWrite && suksesWrite) {
+          onTransaksiSelesai?.();
+        }
+      } catch (e) {
+        let pesan = "Ada gangguan teknis. Coba lagi sebentar ya.";
+        if (e instanceof KesalahanApi) {
+          pesan = e.message;
+          if (e.statusKode === 404) {
+            pesan += " Pastikan backend sudah di-restart (port 8000).";
+          }
+        } else if (
+          e instanceof DOMException &&
+          (e.name === "TimeoutError" || e.name === "AbortError")
+        ) {
+          pesan =
+            "Permintaan terlalu lama. Matikan MCP_LIVE_ENABLED di .env atau coba lagi.";
+        }
+        setPesanError(pesan);
+        setPesanDaftar((sebelum) =>
+          sebelum.filter((p) => p.id !== idAsisten).concat({
+            id: idAsisten,
+            peran: "assistant",
+            isi: pesan,
+          }),
+        );
+      } finally {
+        setSedangKirim(false);
+      }
+    },
+    [idSesi, onTransaksiSelesai, sedangKirim],
+  );
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void kirimPesan(inputTeks);
+  };
+
+  const handleResetSesi = () => {
+    const baru = resetIdSesi();
+    setIdSesi(baru);
+    setPesanDaftar([PESAN_SELAMAT_DATANG]);
+    setPesanError(null);
+  };
+
+  return (
+    <div className="flex min-h-[420px] flex-col rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2 dark:border-zinc-800">
+        <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          Chat
+        </span>
+        <button
+          type="button"
+          onClick={handleResetSesi}
+          className="text-xs text-zinc-500 underline hover:text-zinc-800 dark:hover:text-zinc-200"
+        >
+          Sesi baru
+        </button>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        {pesanDaftar.map((p) => (
+          <PesanChat key={p.id} pesan={p} />
+        ))}
+        <div ref={bawahRef} />
+      </div>
+
+      {pesanError && (
+        <p
+          role="alert"
+          className="mx-4 mb-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 dark:bg-red-950 dark:text-red-200"
+        >
+          {pesanError}
+        </p>
+      )}
+
+      <div className="border-t border-zinc-100 p-3 dark:border-zinc-800">
+        <div className="mb-3">
+          <AksiCepat
+            onPilih={(pesan) => void kirimPesan(pesan)}
+            nonaktif={sedangKirim}
+          />
+        </div>
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            type="text"
+            value={inputTeks}
+            onChange={(e) => setInputTeks(e.target.value)}
+            placeholder="Tanya stok, hutang, atau catat jualan..."
+            disabled={sedangKirim}
+            maxLength={2000}
+            className="flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-[#16a34a] focus:ring-1 focus:ring-[#16a34a] disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            aria-label="Pesan ke Wargio"
+          />
+          <button
+            type="submit"
+            disabled={sedangKirim || !inputTeks.trim()}
+            className="rounded-lg bg-[#16a34a] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#15803d] disabled:opacity-50"
+          >
+            {sedangKirim ? "..." : "Kirim"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -21,6 +21,8 @@ fi
 
 echo "=== buat_indeks ==="
 "$PY" scripts/buat_indeks.py
+echo "=== buat_vector_index ==="
+"$PY" scripts/buat_vector_index.py --bebaskan-slot-sample
 echo "=== seed_data ==="
 "$PY" scripts/seed_data.py
 echo "=== verifikasi_hari1 ==="

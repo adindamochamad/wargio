@@ -4,7 +4,12 @@
   "type": "module",
   "scripts": {
     "verifikasi:mcp": "node scripts/verifikasi_mcp.mjs",
-    "verifikasi:mcp-live": "backend/.venv/bin/python scripts/verifikasi_mcp_live.py"
+    "verifikasi:mcp-live": "backend/.venv/bin/python scripts/verifikasi_mcp_live.py",
+    "verifikasi:hari1": "backend/.venv/bin/python scripts/verifikasi_hari1.py",
+    "verifikasi:hari3": "backend/.venv/bin/python scripts/verifikasi_hari3.py",
+    "verifikasi:hari4": "backend/.venv/bin/python scripts/verifikasi_hari4.py",
+    "verifikasi:hari5": "backend/.venv/bin/python scripts/verifikasi_hari5.py",
+    "hari1": "bash scripts/jalankan_hari1.sh"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0"
