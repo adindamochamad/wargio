@@ -9,7 +9,7 @@ Wargio is an AI business assistant for Indonesian warung owners. Ask in natural 
 ## Demo
 
 - Video: _(YouTube link — coming Hari 7)_
-- **Live app:** _(isi URL VPS Anda setelah deploy, contoh `https://wargio.domain.com`)_
+- **Live app:** https://wargio.adindamochamad.com
 
 ## Architecture
 
