@@ -11,6 +11,9 @@ from app.services.klasifikasi import KATA_BUKAN_PRODUK, normalisasi_teks
 def parse_jumlah_rupiah(teks: str) -> Optional[int]:
     """Parse angka Rupiah dari teks: 50 ribu, 50rb, 50000, Rp 50.000."""
     teks = teks.lower().replace(".", "").replace(",", "")
+    # Tolak jumlah negatif eksplisit (mis. "-50 ribu")
+    if re.search(r"-\s*\d", teks):
+        return None
     m = re.search(r"rp\s*(\d+)", teks)
     if m:
         return int(m.group(1))

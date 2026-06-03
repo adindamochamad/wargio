@@ -196,7 +196,7 @@ async def handle_debt_collection(db: AsyncDatabase) -> tuple[str, list[str]]:
             f"  - **{c['name']}**: {format_rupiah(c.get('debt_total', 0))}"
         )
     return (
-        f"Customer dengan hutang ({len(hasil)}):\n" + "\n".join(baris),
+        f"Pelanggan dengan hutang aktif ({len(hasil)}):\n" + "\n".join(baris),
         [*aksi, "sort_debt"],
     )
 
@@ -223,7 +223,7 @@ async def handle_sales_forecast(db: AsyncDatabase) -> tuple[str, list[str]]:
     agg, aksi = await mcp_aggregate(db, "transactions", pipeline)
 
     if not agg:
-        return "Belum cukup data penjualan untuk forecast.", aksi
+        return "Belum cukup data penjualan untuk perkiraan.", aksi
 
     # MongoDB dayOfWeek: 1=Minggu ... 7=Sabtu; Python weekday: 0=Senin
     peta_mongo_ke_py = {2: 0, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 1: 6}

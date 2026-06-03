@@ -28,6 +28,10 @@ async def health_check() -> dict:
     elif atlas_ok:
         mcp_ok = True
 
+    from app.services.agent_gemini import gemini_runtime_ok
+    gemini_ok = gemini_runtime_ok()
+    gemini_aktif = pengaturan.gemini_terkonfigurasi and gemini_ok is not False
+
     return {
         "status": "ok",
         "service": "wargio-api",
@@ -37,8 +41,9 @@ async def health_check() -> dict:
         "mcp_live_enabled": mcp_live,
         "mcp_mode": "live_stdio" if mcp_live else "pymongo_equivalent",
         "gemini_configured": pengaturan.gemini_terkonfigurasi,
+        "gemini_available": gemini_ok,
         "agent_engine_id": pengaturan.agent_engine_id or None,
         "agent_engine_deployed": bool(pengaturan.agent_engine_id),
-        "agent_mode": "gemini" if pengaturan.gemini_terkonfigurasi else "intent_engine",
+        "agent_mode": "gemini" if gemini_aktif else "intent_engine",
         "system_prompt": "backend/app/prompts/wargio_system.txt",
     }

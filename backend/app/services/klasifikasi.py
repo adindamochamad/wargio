@@ -23,7 +23,11 @@ POLA_INTENT: list[tuple[str, list[str]]] = [
     ("debt_collection", [
         r"siapa.*belum bayar", r"belum bayar hutang", r"tagih hutang",
         r"koleksi hutang", r"daftar hutang", r"yang punya hutang",
-        r"siapa.*punya hutang",
+        r"siapa.*punya hutang", r"siapa.*berhutang", r"siapa.*berutang",
+        r"list.*hutang.*(?:semua|customer|pelanggan)",
+        r"rekap.*hutang", r"semua.*piutang", r"penagihan",
+        r"daftar.*(?:bon|piutang)", r"siapa.*(?:ada\s+)?bon",
+        r"tampilkan.*(?:hutang|piutang)",
     ]),
     ("record_payment", [
         r"(?<!belum )bayar\s+(?:hutang|utang|piutang)",

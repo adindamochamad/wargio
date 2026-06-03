@@ -16,11 +16,16 @@ BATAS_KEDALUWARSA_PENDING = timedelta(minutes=30)
 # Kata konfirmasi / batal
 KATA_KONFIRMASI = frozenset({
     "ya", "iya", "ok", "oke", "setuju", "lanjut", "lanjutkan",
-    "konfirmasi", "benar", "betul", "sip", "yoi",
+    "konfirmasi", "benar", "betul", "sip", "yoi", "gas", "jadi",
+    "yap", "yep", "iyalah", "yasudah", "ya sudah",
 })
 KATA_BATAL = frozenset({
     "tidak", "batal", "cancel", "gak jadi", "ga jadi", "jangan",
+    "no", "nope", "ga", "gak", "enggak",
 })
+
+# Partikel penegas Bahasa Indonesia yang tidak mengubah makna konfirmasi
+_PARTIKEL = r"(?:\s+(?:dong|deh|lah|pak|bu|nih|ya|saja|aja|dah|lho|kok))?"
 
 
 def normalisasi_konfirmasi(pesan: str) -> str:
@@ -31,12 +36,18 @@ def adalah_konfirmasi(pesan: str) -> bool:
     teks = normalisasi_konfirmasi(pesan)
     if teks in KATA_KONFIRMASI:
         return True
-    return bool(re.match(r"^(ya|iya|ok|setuju)\s*,?\s*$", teks))
+    # "ya dong", "ok deh", "iya lah", "gas lah", dll.
+    return bool(re.match(
+        rf"^(ya|iya|ok|oke|setuju|gas|jadi|sip){_PARTIKEL}\s*[,!]?\s*$",
+        teks,
+    ))
 
 
 def adalah_batal(pesan: str) -> bool:
     teks = normalisasi_konfirmasi(pesan)
-    return teks in KATA_BATAL or teks.startswith("batal")
+    if teks in KATA_BATAL:
+        return True
+    return teks.startswith("batal") or teks.startswith("cancel")
 
 
 async def simpan_pending(

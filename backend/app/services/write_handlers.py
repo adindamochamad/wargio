@@ -271,7 +271,7 @@ async def siapkan_record_payment(
 
     if opsi:
         baris = "\n".join(f"  {i + 1}. {c['name']}" for i, c in enumerate(opsi))
-        return f"Customer ambigu:\n{baris}", [*aksi, "disambiguasi_customer"]
+        return f"Ada beberapa pelanggan yang cocok:\n{baris}", [*aksi, "disambiguasi_customer"]
     if not customer:
         return f"Customer \"{nama}\" tidak ditemukan.", [*aksi, "customer_tidak_ditemukan"]
 

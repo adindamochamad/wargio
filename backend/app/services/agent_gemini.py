@@ -17,6 +17,14 @@ _PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "wargio_system.
 
 INTENT_VALID = {i for i in INTENT_LIST if i != "unknown"}
 
+# Lacak status Gemini runtime — diupdate setiap panggilan
+_gemini_status: dict = {"ok": None, "error": None}
+
+
+def gemini_runtime_ok() -> bool | None:
+    """None = belum pernah dipanggil, True = sukses, False = gagal."""
+    return _gemini_status["ok"]
+
 
 @lru_cache
 def _muat_system_prompt() -> str:
@@ -66,11 +74,18 @@ async def klasifikasi_dengan_gemini(pesan: str) -> Optional[str]:
         # Ambil token intent pertama yang valid
         for intent in INTENT_VALID | {"unknown"}:
             if intent in teks.split():
-                return intent if intent != "unknown" else None
+                result = intent if intent != "unknown" else None
+                _gemini_status["ok"] = True
+                _gemini_status["error"] = None
+                return result
         if teks in INTENT_VALID:
+            _gemini_status["ok"] = True
+            _gemini_status["error"] = None
             return teks
         return None
-    except Exception:
+    except Exception as e:
+        _gemini_status["ok"] = False
+        _gemini_status["error"] = type(e).__name__
         return None
 
 
