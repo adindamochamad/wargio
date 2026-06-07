@@ -1,0 +1,49 @@
+---
+description: Wajib jalankan 3 fase verifikasi agentic terpisah setelah menyelesaikan task todolist Wargio
+alwaysApply: true
+---
+
+# Wargio — Verifikasi Agentic (3 Fase Terpisah)
+
+Setelah menyelesaikan **satu task** dari `docs/todolist-harian-wargio.md` atau sub-tugas manifest, WAJIB jalankan audit **berurutan dan terpisah**:
+
+## Urutan Wajib
+
+1. **Verifikasi** — DoD & struktur (`--fase verifikasi`)
+2. **Testing** — pytest/vitest/coverage (`--fase testing`)
+3. **Stress** — edge case & beban (`--fase stress`)
+
+Jangan centang `[x]` di todolist sebelum ketiga fase selesai dinilai.
+
+## Perintah
+
+```bash
+python scripts/verifikasi_agentic/jalankan.py --tugas <ID> --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas <ID> --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas <ID> --fase stress
+```
+
+ID tugas: `python scripts/verifikasi_agentic/jalankan.py --list`
+
+Sub-tugas contoh: `record_sale`, `frontend-chat`, `deploy-vps`
+
+## Perilaku Agent (Jujur & Kritis)
+
+- Laporkan **VERDICT** tiap fase: LOLOS | LOLOS_DENGAN_RESERVASI | GAGAL
+- **Jangan** bilang "selesai" jika pytest skip Atlas atau stress gate SKIP
+- **Jangan** optimis — skor <100 dan WARN harus disebutkan eksplisit
+- Baca laporan `reports/verifikasi/*.md` dan sampaikan blocker ke user
+- Verdict GAGAL → lanjut perbaiki, ulangi fase yang gagal
+
+## Mapping Task → ID
+
+| Todolist | ID manifest |
+|----------|-------------|
+| Hari 1 | `hari1-foundation` |
+| Hari 2 | `hari2-read-intents` |
+| Hari 3 | `hari3-write-intents` |
+| Hari 4 | `hari4-frontend` |
+| Hari 5 | `hari5-deploy` |
+| Hari 6 | `hari6-hardening` |
+
+Detail: `agent/verifikasi/README.md`

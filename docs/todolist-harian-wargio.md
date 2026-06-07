@@ -11,6 +11,24 @@ Fokus utama: selesaikan Tier 1 lebih dulu, lalu Tier 2, baru polish.
 - Jika task blocker belum selesai, task nice-to-have di hari itu ditunda.
 - **Git:** commit/push hanya dengan author pemilik repo — tanpa `Co-authored-by` (lihat `.cursor/rules/wargio-git.mdc`).
 
+## Verifikasi Agentic (Wajib Setiap Task)
+
+Setelah **satu checkbox** selesai diimplementasi, jalankan **3 fase terpisah** sebelum centang `[x]`:
+
+```bash
+python scripts/verifikasi_agentic/jalankan.py --list
+python scripts/verifikasi_agentic/jalankan.py --tugas <ID> --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas <ID> --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas <ID> --fase stress
+# atau: npm run verifikasi:agentic -- --tugas hari3-write-intents --fase all
+```
+
+- Laporan jujur: `reports/verifikasi/*.md`
+- Panduan: `agent/verifikasi/README.md`
+- Cursor rule: `.cursor/rules/wargio-verifikasi-agentic.mdc`
+
+**Jangan centang `[x]` jika verdict fase manapun = GAGAL.**
+
 ## Hari 1 — Foundation & Infra
 
 ### Target Hari Ini
@@ -145,14 +163,15 @@ backend/.venv/bin/python scripts/verifikasi_hari4.py
 - [x] Artifact deploy VPS (Docker, Nginx, `docs/deploy-vps.md`).
 - [x] Rate limiting per sesi (`MiddlewareRateLimit`).
 - [x] Template `deploy/.env.production.example` (tanpa rahasia di git).
-- [x] Smoke test `scripts/smoke_production.sh`.
+- [x] Smoke test `scripts/smoke_production.sh` (+ 4 intent Tier 1 + atlas check).
 - [x] Verifikasi `scripts/verifikasi_hari5.py`.
-- [ ] Deploy di VPS Anda (`scripts/deploy_vps.sh`).
-- [ ] Nginx + SSL (Let's Encrypt).
-- [ ] Atlas Network Access: allowlist IP VPS.
+- [x] Skrip orkestrator Hari 5 (`selesaikan_hari5.sh`, `siapkan_env_production.sh`, `deploy_ssh.sh`, `pasang_nginx_vps.sh`, `cek_ip_vps_atlas.sh`, `jalankan_k6_production.sh`).
+- [ ] Deploy di VPS Anda (`scripts/deploy_vps.sh` atau `deploy_ssh.sh`).
+- [ ] Nginx + SSL (Let's Encrypt) — `pasang_nginx_vps.sh`.
+- [ ] Atlas Network Access: allowlist IP VPS — `cek_ip_vps_atlas.sh`.
 - [ ] Isi Live URL di README & Devpost.
 - [ ] Smoke production: `WARGIO_PRODUCTION_URL=... bash scripts/smoke_production.sh`.
-- [ ] (Opsional) k6 10 user — catat p95 di docs.
+- [ ] (Opsional) k6 10 user — `bash scripts/jalankan_k6_production.sh` → `docs/hari5-load-test.md`.
 
 ### Definition of Done
 - [ ] URL production HTTPS bisa diakses incognito (`/api/health` 200, `atlas=true`).

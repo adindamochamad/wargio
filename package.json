@@ -9,6 +9,12 @@
     "verifikasi:hari3": "backend/.venv/bin/python scripts/verifikasi_hari3.py",
     "verifikasi:hari4": "backend/.venv/bin/python scripts/verifikasi_hari4.py",
     "verifikasi:hari5": "backend/.venv/bin/python scripts/verifikasi_hari5.py",
+    "verifikasi:agentic": "backend/.venv/bin/python scripts/verifikasi_agentic/jalankan.py",
+    "verifikasi:agentic:list": "backend/.venv/bin/python scripts/verifikasi_agentic/jalankan.py --list",
+    "hari5": "bash scripts/selesaikan_hari5.sh all",
+    "hari5:env": "bash scripts/siapkan_env_production.sh",
+    "hari5:smoke": "bash scripts/smoke_production.sh",
+    "hari5:k6": "bash scripts/jalankan_k6_production.sh",
     "hari1": "bash scripts/jalankan_hari1.sh"
   },
   "devDependencies": {

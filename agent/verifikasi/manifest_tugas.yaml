@@ -1,0 +1,134 @@
+# Manifest tugas Wargio — dipetakan ke docs/todolist-harian-wargio.md
+# Setiap tugas punya 3 fase terpisah: verifikasi | testing | stress
+
+versi: 1
+
+# Target coverage (penilaian jujur — belum tercapai = WARN, bukan lolos palsu)
+target:
+  coverage_backend: 80
+  coverage_frontend: 70
+  p95_ms: 5000
+
+tugas:
+  hari1-foundation:
+    hari: 1
+    label: "Foundation & Infra"
+    verifikasi_script: scripts/verifikasi_hari1.py
+    gates_tambahan: [repo_public, atlas_ping, seed_minimum]
+    pytest: []
+    vitest: false
+    stress: []
+
+  hari2-read-intents:
+    hari: 2
+    label: "Tier 1 Read Intents"
+    verifikasi_script: scripts/verifikasi_hari2.py
+    gates_tambahan: [modul_intent_handlers, gemini_atau_regex]
+    pytest:
+      - tests/test_intents_hari2.py
+      - tests/test_klasifikasi.py
+      - tests/test_executor.py
+    vitest: false
+    stress: [intent_salah_klasifikasi, input_kosong_read]
+
+  hari3-write-intents:
+    hari: 3
+    label: "Write + Tier 2 Dasar"
+    verifikasi_script: scripts/verifikasi_hari3.py
+    gates_tambahan: [modul_write, konfirmasi_wajib]
+    pytest:
+      - tests/test_hari3.py
+    vitest: false
+    stress:
+      - qty_negatif
+      - stok_kurang
+      - konfirmasi_batal
+      - disambiguasi_customer
+
+  hari4-frontend:
+    hari: 4
+    label: "Frontend MVP"
+    verifikasi_script: scripts/verifikasi_hari4.py
+    gates_tambahan: [build_next, dashboard_route]
+    pytest: [tests/test_health.py]
+    vitest: true
+    stress: [cors_preflight, chat_timeout_ui]
+
+  hari5-deploy:
+    hari: 5
+    label: "Deploy & Production"
+    verifikasi_script: scripts/verifikasi_hari5.py
+    gates_tambahan: [artifact_docker, nginx_template]
+    pytest: []
+    vitest: false
+    stress: [load_k6_ringan, health_production]
+
+  hari6-hardening:
+    hari: 6
+    label: "Testing Blitz & Hardening"
+    verifikasi_script: null
+    gates_tambahan: [coverage_backend, struktur_test]
+    pytest: [tests/]
+    vitest: true
+    stress:
+      - edge_case_hari6
+      - isolasi_sesi
+      - fuzzy_capslock
+      - mcp_fallback_pesan
+
+  hari7-demo:
+    hari: 7
+    label: "Demo Video"
+    verifikasi_script: null
+    gates_tambahan: [readme_video_link, readme_live_url]
+    pytest: []
+    vitest: false
+    stress: []
+
+  hari8-submit:
+    hari: 8
+    label: "Final Polish & Devpost"
+    verifikasi_script: null
+    gates_tambahan: [license_mit, no_secrets_in_repo]
+    pytest: [tests/]
+    vitest: true
+    stress: [load_k6_ringan]
+
+# Sub-tugas granular — jalankan setelah menyelesaikan satu checkbox todolist
+sub_tugas:
+  check_stock:
+    parent: hari2-read-intents
+    label: "Intent check_stock"
+    pytest: ["tests/test_intents_hari2.py -k check_stock"]
+    stress: [intent_salah_klasifikasi]
+
+  check_debt:
+    parent: hari2-read-intents
+    label: "Intent check_debt"
+    pytest: ["tests/test_intents_hari2.py -k check_debt"]
+    stress: [disambiguasi_customer]
+
+  record_sale:
+    parent: hari3-write-intents
+    label: "Intent record_sale"
+    pytest: ["tests/test_hari3.py -k record_sale"]
+    stress: [qty_negatif, stok_kurang, konfirmasi_batal]
+
+  record_payment:
+    parent: hari3-write-intents
+    label: "Intent record_payment"
+    pytest: ["tests/test_hari3.py -k payment"]
+    stress: [disambiguasi_customer, konfirmasi_batal]
+
+  frontend-chat:
+    parent: hari4-frontend
+    label: "UI Chat + quick actions"
+    vitest: true
+    gates_tambahan: [chat_component_ada]
+    stress: [cors_preflight]
+
+  deploy-vps:
+    parent: hari5-deploy
+    label: "Deploy VPS live"
+    gates_tambahan: [production_url_hidup]
+    stress: [load_k6_ringan, health_production]

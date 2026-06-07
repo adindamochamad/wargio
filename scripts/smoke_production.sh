@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Smoke test URL production — set WARGIO_PRODUCTION_URL=https://domain-anda.com
+# Smoke test URL production — 4 intent Tier 1 + health + dashboard
 set -euo pipefail
 
 URL="${WARGIO_PRODUCTION_URL:-}"
@@ -11,7 +11,7 @@ fi
 URL="${URL%/}"
 echo "=== Smoke production: ${URL} ==="
 
-cek() {
+cek_http() {
   local path="$1"
   local harapan="$2"
   local code
@@ -24,18 +24,51 @@ cek() {
   echo "OK: ${path} → ${code}"
 }
 
-cek "/api/health" "200"
-cek "/api/dashboard" "200"
+cek_http "/api/health" "200"
+
+if ! grep -q '"atlas":true' /tmp/wargio_smoke_body.txt && ! grep -q '"atlas": true' /tmp/wargio_smoke_body.txt; then
+  echo "GAGAL: /api/health atlas!=true — cek MONGODB_URI & IP VPS di Atlas allowlist"
+  cat /tmp/wargio_smoke_body.txt
+  exit 1
+fi
+echo "OK: atlas=true"
+
+cek_http "/api/dashboard" "200"
 
 SID="smoke-$(date +%s)"
-res=$(curl -s -X POST "${URL}/api/chat" \
-  -H "Content-Type: application/json" \
-  -H "X-Session-Id: ${SID}" \
-  -d '{"pesan":"stok indomie goreng berapa?"}')
-echo "${res}" | grep -q check_stock && echo "OK: chat check_stock" || {
-  echo "GAGAL: chat intent"
-  echo "${res}" | head -c 300
-  exit 1
+
+cek_intent() {
+  local pesan="$1"
+  local harapan="$2"
+  local res
+  res=$(curl -s -X POST "${URL}/api/chat" \
+    -H "Content-Type: application/json" \
+    -H "X-Session-Id: ${SID}" \
+    -d "{\"pesan\":\"${pesan}\"}")
+  if echo "${res}" | grep -q "\"intent\":\"${harapan}\""; then
+    echo "OK: intent ${harapan}"
+  else
+    echo "GAGAL: chat '${harapan}' — respons:"
+    echo "${res}" | head -c 400
+    exit 1
+  fi
 }
 
-echo "=== Smoke production: LOLOS ==="
+cek_intent "stok indomie goreng berapa?" "check_stock"
+cek_intent "hutang Bu Sari berapa?" "check_debt"
+cek_intent "berapa pendapatan hari ini?" "sales_report"
+cek_intent "produk apa yang mau habis?" "restock_alert"
+
+# UI root (Next.js) — skip jika smoke hanya ke port API
+if [[ "${URL}" == *":8000"* ]]; then
+  echo "INFO: skip UI / — smoke ke port API saja"
+else
+  code_root=$(curl -s -o /tmp/wargio_smoke_root.txt -w "%{http_code}" "${URL}/")
+  if [[ "${code_root}" != "200" ]]; then
+    echo "GAGAL: / HTTP ${code_root} — frontend tidak hidup"
+    exit 1
+  fi
+  echo "OK: / → 200 (frontend)"
+fi
+
+echo "=== Smoke production: LOLOS (health + dashboard + 4 intent + UI) ==="

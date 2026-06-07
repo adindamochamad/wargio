@@ -93,16 +93,27 @@ Buka http://localhost:3000.
 Panduan lengkap: **[docs/deploy-vps.md](docs/deploy-vps.md)**
 
 ```bash
-cp deploy/.env.production.example deploy/.env.production
-# Edit: MONGODB_URI, CORS_ORIGINS, WARGIO_PUBLIC_URL
+# 1. Siapkan env production (dari .env lokal + domain HTTPS)
+bash scripts/siapkan_env_production.sh https://domain-anda.com
 
-bash scripts/deploy_vps.sh          # di VPS setelah git pull
-# Pasang Nginx + certbot (lihat deploy/nginx/wargio.conf.example)
+# 2. Deploy di VPS (atau dari laptop via SSH)
+bash scripts/deploy_vps.sh
+# atau: bash scripts/deploy_ssh.sh user@ip-vps https://domain-anda.com
 
+# 3. Di VPS: Nginx + SSL + Atlas allowlist IP
+sudo bash scripts/pasang_nginx_vps.sh domain-anda.com
+bash scripts/cek_ip_vps_atlas.sh   # → allowlist IP di Atlas
+
+# 4. Smoke + load test dari laptop
 export WARGIO_PRODUCTION_URL=https://domain-anda.com
 bash scripts/smoke_production.sh
+bash scripts/jalankan_k6_production.sh
+
 npm run verifikasi:hari5
+npm run hari5   # panduan urutan lengkap
 ```
+
+Orkestrator: `bash scripts/selesaikan_hari5.sh all`
 
 ## Environment Variables
 

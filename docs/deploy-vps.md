@@ -30,36 +30,51 @@ API lewat path sama: `https://wargio.contohdomain.com/api/health`
 ```bash
 git clone https://github.com/adindamochamad/wargio.git
 cd wargio
-cp deploy/.env.production.example deploy/.env.production
-nano deploy/.env.production   # isi MONGODB_URI, GEMINI_API_KEY, domain, dll.
+
+# Otomatis dari .env lokal (salin .env dulu jika perlu)
+bash scripts/siapkan_env_production.sh https://wargio.contohdomain.com
+
+# Manual alternatif:
+# cp deploy/.env.production.example deploy/.env.production
+# nano deploy/.env.production
 ```
+
+**Penting VPS:** set `MCP_LIVE_ENABLED=false`. Untuk Gemini di Docker, isi `GEMINI_API_KEY` (ADC `gcloud` tidak ada di container).
 
 ### 2. Build & jalankan
 
 ```bash
-cd deploy/docker
-docker compose --env-file ../.env.production up -d --build
+bash scripts/deploy_vps.sh
+# atau: bash scripts/selesaikan_hari5.sh deploy-vps
 ```
 
-Layanan internal: `api` (8000), `web` (3000). Nginx di host (lihat bawah) atau tambah container `nginx`.
-
-### 3. Nginx + SSL di host
+### 3. Atlas allowlist IP VPS
 
 ```bash
-sudo cp deploy/nginx/wargio.conf.example /etc/nginx/sites-available/wargio
-# Edit server_name dan path proxy
-sudo ln -s /etc/nginx/sites-available/wargio /etc/nginx/sites-enabled/
-sudo certbot --nginx -d wargio.contohdomain.com
-sudo nginx -t && sudo systemctl reload nginx
+bash scripts/cek_ip_vps_atlas.sh
+# Tambahkan IP/32 di Atlas Network Access
 ```
 
-### 4. Verifikasi
+### 4. Nginx + SSL di host
 
 ```bash
-# Dari laptop
+sudo bash scripts/pasang_nginx_vps.sh wargio.contohdomain.com
+# atau manual: deploy/nginx/wargio.conf.example + certbot
+```
+
+### 5. Verifikasi dari laptop
+
+```bash
 export WARGIO_PRODUCTION_URL=https://wargio.contohdomain.com
+bash scripts/smoke_production.sh      # health + 4 intent + UI
+bash scripts/jalankan_k6_production.sh  # p95 → docs/hari5-load-test.md
 python scripts/verifikasi_hari5.py
-bash scripts/smoke_production.sh
+```
+
+### Deploy dari laptop via SSH
+
+```bash
+bash scripts/deploy_ssh.sh user@ip-vps https://wargio.contohdomain.com
 ```
 
 ## Variabel production penting
