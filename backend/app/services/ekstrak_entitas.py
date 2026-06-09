@@ -62,14 +62,16 @@ def ekstrak_item_penjualan(pesan: str) -> list[tuple[int, str]]:
     teks, _ = pisahkan_customer_dari_penjualan(pesan)
     teks = normalisasi_teks(teks)
     teks = re.sub(
-        r"^(tadi\s+)?(jual|terjual|catat penjualan|catat jualan|jualan)\s+",
+        r"^(?:(?:tadi|just)\s+)?"
+        r"(?:jual|terjual|catat penjualan|catat jualan|jualan|sold|sell|record(?:\s+a)?\s+sale)\s+",
         "",
         teks,
+        flags=re.IGNORECASE,
     )
     if not teks:
         return []
 
-    bagian = re.split(r"\s+(?:sama dengan|sama|dan|\+)\s+", teks)
+    bagian = re.split(r"\s+(?:sama dengan|sama|dan|and|\+)\s+", teks, flags=re.IGNORECASE)
     hasil: list[tuple[int, str]] = []
     for potong in bagian:
         potong = potong.strip().rstrip(".,!?")
@@ -105,16 +107,29 @@ def ekstrak_pembayaran_hutang(pesan: str) -> tuple[Optional[str], Optional[int]]
     Parse pembayaran hutang: nama customer + jumlah.
     Contoh: 'Bu Sari bayar hutang 50 ribu'
     """
-    teks = normalisasi_teks(pesan)
+    # Jangan pakai normalisasi_teks — "bu/pak" adalah bagian nama customer
+    teks = re.sub(r"\s+", " ", pesan.lower().strip())
     jumlah = parse_jumlah_rupiah(teks)
 
-    # Pola: {nama} bayar hutang ...
+    # Pola: {nama} bayar hutang ... / {nama} paid debt ...
     m = re.search(
-        r"^(.+?)\s+bayar\s+(?:hutang|utang|piutang)",
+        r"^(.+?)\s+(?:bayar\s+(?:hutang|utang|piutang)|paid\s+debt)",
         teks,
+        flags=re.IGNORECASE,
     )
     if m:
         return m.group(1).strip(), jumlah
+
+    # Pola: pay debt for {nama} ...
+    m = re.search(
+        r"pay(?:s|ing)?\s+debt\s+(?:for\s+)?(.+?)(?:\s+\d|\s+rp|\s*$)",
+        teks,
+        flags=re.IGNORECASE,
+    )
+    if m:
+        nama = m.group(1).strip()
+        nama = re.sub(r"\s+\d+.*$", "", nama).strip()
+        return nama if nama else None, jumlah
 
     # Pola: bayar hutang {nama} ...
     m = re.search(
