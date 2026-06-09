@@ -28,6 +28,7 @@ _INTENT_WRITE = frozenset({"record_sale", "record_payment"})
 from app.services.write_handlers import (
     eksekusi_record_payment,
     eksekusi_record_sale,
+    proses_disambiguasi_penjualan,
     siapkan_record_payment,
     siapkan_record_sale,
 )
@@ -72,6 +73,17 @@ async def _proses_konfirmasi_tunda(
             ),
             "intent": pending.get("tipe"),
             "actions_taken": ["konfirmasi_dibatalkan"],
+            "classification_mode": "regex",
+        }
+
+    if pending.get("tipe") == "disambiguasi_penjualan":
+        balasan, aksi, intent = await proses_disambiguasi_penjualan(
+            db, session_id, pending, pesan,
+        )
+        return {
+            "balasan": balasan,
+            "intent": intent,
+            "actions_taken": aksi,
             "classification_mode": "regex",
         }
 

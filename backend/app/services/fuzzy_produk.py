@@ -37,12 +37,22 @@ def hitung_skor_partial(teks_cari: str, produk: dict[str, Any]) -> float:
     daftar_alias = [str(a).lower() for a in produk.get("name_aliases") or []]
 
     if teks_cari == nama or teks_cari in daftar_alias:
-        return 1.0
-    if nama.startswith(teks_cari) or any(a.startswith(teks_cari) for a in daftar_alias):
-        return 0.8
-    if teks_cari in nama or any(teks_cari in a for a in daftar_alias):
-        return 0.6
-    return 0.0
+        skor = 1.0
+    elif nama.startswith(teks_cari) or any(a.startswith(teks_cari) for a in daftar_alias):
+        skor = 0.8
+    elif teks_cari in nama or any(teks_cari in a for a in daftar_alias):
+        skor = 0.6
+    else:
+        skor = 0.0
+
+    # Bonus token ukuran (600ml vs 1.5L) — hindari ambigu palsu
+    for token in re.findall(r"\d+(?:\.\d+)?\s*(?:ml|l|kg|g|gr|pcs|bungkus)", teks_cari):
+        token_bersih = re.sub(r"\s+", "", token)
+        nama_bersih = re.sub(r"\s+", "", nama)
+        if token_bersih in nama_bersih:
+            skor = max(skor, 0.95)
+
+    return skor
 
 
 async def _cari_exact(

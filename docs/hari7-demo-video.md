@@ -31,7 +31,7 @@ bash scripts/rehearsal_demo_video.sh   # latihan query persis seperti di video
 | Scene | Ketik persis di chat (EN toggle ON) |
 |-------|-------------------------------------|
 | 2 — Stock | `how much indomie goreng stock is left?` |
-| 3 — Sale draft | `sold 2 indomie goreng and 1 air mineral aqua 600ml` *(butuh stok Aqua > 0 — jalankan rehearsal dulu)* |
+| 3 — Sale draft | `sold 2 indomie goreng and 1 air mineral aqua 600ml` *(pakai **air mineral**, bukan hanya "mineral aqua")* |
 | 3 — Confirm | `yes` |
 | 4 — Debt list | `who still owes money this week?` |
 | 4 — Payment draft | `Bu Sari paid debt 50000` |

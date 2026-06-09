@@ -15,6 +15,11 @@ from app.services.ekstrak_entitas import (
     ekstrak_pembayaran_hutang,
     pisahkan_customer_dari_penjualan,
 )
+from app.services.disambiguasi import (
+    format_pesan_pilih_ulang,
+    parse_pilihan_opsi,
+    ringkas_opsi_produk,
+)
 from app.services.konfirmasi import (
     format_ringkasan_pembayaran,
     format_ringkasan_penjualan,
@@ -55,31 +60,61 @@ async def _resolve_customer(
     return None, []
 
 
-async def siapkan_record_sale(
+def _item_penjualan_ke_baris(
+    produk: dict[str, Any],
+    qty: int,
+) -> dict[str, Any]:
+    harga = produk["price_sell"]
+    return {
+        "product_id": str(produk["_id"]),
+        "product_name": produk["name"],
+        "sku": produk.get("sku", ""),
+        "qty": qty,
+        "price": harga,
+        "subtotal": harga * qty,
+        "stock_sebelum": produk["stock_current"],
+    }
+
+
+async def _simpan_pending_disambiguasi_penjualan(
     db: AsyncDatabase,
     session_id: str,
-    pesan: str,
-) -> tuple[str, list[str]]:
-    """Validasi penjualan, simpan draft, minta konfirmasi."""
-    _, nama_customer_hutang = pisahkan_customer_dari_penjualan(pesan)
-    item_mentah = ekstrak_item_penjualan(pesan)
-    if not item_mentah:
-        return (
-            t(
-                'Format penjualan kurang jelas. Contoh: '
-                '"tadi jual 3 aqua sama 2 rokok" atau '
-                '"jual 2 indomie bon Bu Sari"',
-                'Sale format unclear. Example: '
-                '"sold 3 aqua and 2 cigarettes" or '
-                '"sell 2 indomie on credit for Bu Sari"',
-            ),
-            ["minta_detail_penjualan"],
-        )
+    *,
+    pesan_asli: str,
+    item_mentah: list[tuple[int, str]],
+    item_siap: list[dict[str, Any]],
+    indeks_ambigu: int,
+    nama_ambigu: str,
+    opsi: list[dict[str, Any]],
+) -> None:
+    await simpan_pending(
+        db,
+        session_id,
+        {
+            "tipe": "disambiguasi_penjualan",
+            "pesan_asli": pesan_asli,
+            "item_mentah": [[q, n] for q, n in item_mentah],
+            "item_siap": item_siap,
+            "indeks_ambigu": indeks_ambigu,
+            "nama_ambigu": nama_ambigu,
+            "opsi": [ringkas_opsi_produk(p) for p in opsi],
+        },
+    )
 
-    item_siap: list[dict[str, Any]] = []
+
+async def _lanjutkan_siapkan_record_sale(
+    db: AsyncDatabase,
+    session_id: str,
+    pesan_asli: str,
+    item_mentah: list[tuple[int, str]],
+    item_siap: list[dict[str, Any]],
+    mulai_indeks: int,
+) -> tuple[str, list[str]]:
+    """Resolve item penjualan dari indeks tertentu; simpan pending jika ambigu."""
     aksi = ["mcp:find"]
 
-    for qty, nama_produk in item_mentah:
+    for indeks in range(mulai_indeks, len(item_mentah)):
+        qty, nama_produk = item_mentah[indeks]
         if qty <= 0:
             return (
                 t(
@@ -95,6 +130,16 @@ async def siapkan_record_sale(
         if opsi:
             baris = "\n".join(
                 f"  {i + 1}. {p['name']}" for i, p in enumerate(opsi)
+            )
+            await _simpan_pending_disambiguasi_penjualan(
+                db,
+                session_id,
+                pesan_asli=pesan_asli,
+                item_mentah=item_mentah,
+                item_siap=item_siap,
+                indeks_ambigu=indeks,
+                nama_ambigu=nama_produk,
+                opsi=opsi,
             )
             return (
                 t(
@@ -122,19 +167,11 @@ async def siapkan_record_sale(
                 [*aksi, "stok_tidak_cukup"],
             )
 
-        harga = produk["price_sell"]
-        item_siap.append({
-            "product_id": str(produk["_id"]),
-            "product_name": produk["name"],
-            "sku": produk.get("sku", ""),
-            "qty": qty,
-            "price": harga,
-            "subtotal": harga * qty,
-            "stock_sebelum": produk["stock_current"],
-        })
+        item_siap.append(_item_penjualan_ke_baris(produk, qty))
 
     total = sum(i["subtotal"] for i in item_siap)
-    teks = pesan.lower()
+    _, nama_customer_hutang = pisahkan_customer_dari_penjualan(pesan_asli)
+    teks = pesan_asli.lower()
     metode = (
         "hutang"
         if any(k in teks for k in ("hutang", "bon", "credit", "on credit"))
@@ -190,6 +227,97 @@ async def siapkan_record_sale(
     await simpan_pending(db, session_id, draft)
 
     return format_ringkasan_penjualan(draft), [*aksi, "minta_konfirmasi"]
+
+
+async def siapkan_record_sale(
+    db: AsyncDatabase,
+    session_id: str,
+    pesan: str,
+) -> tuple[str, list[str]]:
+    """Validasi penjualan, simpan draft, minta konfirmasi."""
+    item_mentah = ekstrak_item_penjualan(pesan)
+    if not item_mentah:
+        return (
+            t(
+                'Format penjualan kurang jelas. Contoh: '
+                '"tadi jual 3 aqua sama 2 rokok" atau '
+                '"jual 2 indomie bon Bu Sari"',
+                'Sale format unclear. Example: '
+                '"sold 3 aqua and 2 cigarettes" or '
+                '"sell 2 indomie on credit for Bu Sari"',
+            ),
+            ["minta_detail_penjualan"],
+        )
+
+    return await _lanjutkan_siapkan_record_sale(
+        db,
+        session_id,
+        pesan_asli=pesan,
+        item_mentah=item_mentah,
+        item_siap=[],
+        mulai_indeks=0,
+    )
+
+
+async def proses_disambiguasi_penjualan(
+    db: AsyncDatabase,
+    session_id: str,
+    pending: dict[str, Any],
+    pesan: str,
+) -> tuple[str, list[str], Optional[str]]:
+    """
+    Lanjutkan record_sale setelah user memilih opsi produk.
+    Return (balasan, aksi, intent) — intent None jika masih menunggu.
+    """
+    opsi_ringkas = pending.get("opsi") or []
+    indeks_pilihan = parse_pilihan_opsi(pesan, opsi_ringkas)
+    if indeks_pilihan is None:
+        return format_pesan_pilih_ulang(), ["disambiguasi_gagal"], "disambiguasi_penjualan"
+
+    item_mentah_mentah = pending.get("item_mentah") or []
+    item_mentah = [(int(q), str(n)) for q, n in item_mentah_mentah]
+    item_siap = list(pending.get("item_siap") or [])
+    indeks_ambigu = int(pending.get("indeks_ambigu", 0))
+    qty, _ = item_mentah[indeks_ambigu]
+
+    produk_id = opsi_ringkas[indeks_pilihan]["id"]
+    produk = await db.products.find_one({"_id": ObjectId(produk_id)})
+    if not produk:
+        await hapus_pending(db, session_id)
+        return (
+            t(
+                "Produk pilihan tidak ditemukan. Coba catat penjualan dari awal.",
+                "Selected product not found. Please record the sale again.",
+            ),
+            ["produk_tidak_ditemukan"],
+            None,
+        )
+
+    if produk["stock_current"] < qty:
+        await hapus_pending(db, session_id)
+        return (
+            t(
+                f"Stok **{produk['name']}** tidak cukup. "
+                f"Tersedia {produk['stock_current']} {produk['unit']}, diminta {qty}.",
+                f"**{produk['name']}** stock insufficient. "
+                f"Available {produk['stock_current']} {produk['unit']}, requested {qty}.",
+            ),
+            ["stok_tidak_cukup"],
+            None,
+        )
+
+    item_siap.append(_item_penjualan_ke_baris(produk, qty))
+    balasan, aksi = await _lanjutkan_siapkan_record_sale(
+        db,
+        session_id,
+        pesan_asli=str(pending.get("pesan_asli", "")),
+        item_mentah=item_mentah,
+        item_siap=item_siap,
+        mulai_indeks=indeks_ambigu + 1,
+    )
+
+    intent = "record_sale" if "minta_konfirmasi" in aksi else "disambiguasi_penjualan"
+    return balasan, aksi, intent
 
 
 async def eksekusi_record_sale(
