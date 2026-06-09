@@ -140,8 +140,8 @@ export function ChatWargio({
   };
 
   return (
-    <div className="flex min-h-[420px] flex-col rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2 dark:border-zinc-800">
+    <div className="wargio-panel-kaca flex min-h-[420px] flex-col rounded-xl shadow-lg shadow-[#16a34a]/5 dark:shadow-black/25">
+      <div className="flex items-center justify-between border-b border-white/30 px-4 py-2 dark:border-white/8">
         <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
           {kamus.chat}
         </span>
@@ -170,7 +170,7 @@ export function ChatWargio({
         </p>
       )}
 
-      <div className="border-t border-zinc-100 p-3 dark:border-zinc-800">
+      <div className="border-t border-white/30 p-3 dark:border-white/8">
         <div className="mb-3">
           <AksiCepat
             onPilih={(pesan) => void kirimPesan(pesan)}
@@ -185,7 +185,7 @@ export function ChatWargio({
             placeholder={kamus.placeholderChat}
             disabled={sedangKirim}
             maxLength={2000}
-            className="flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-[#16a34a] focus:ring-1 focus:ring-[#16a34a] disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+            className="flex-1 rounded-lg border border-white/50 bg-white/60 px-3 py-2.5 text-sm outline-none backdrop-blur-sm focus:border-[#16a34a] focus:ring-1 focus:ring-[#16a34a] disabled:opacity-60 dark:border-white/10 dark:bg-zinc-950/50 dark:text-zinc-100"
             aria-label={kamus.placeholderChat}
           />
           <button

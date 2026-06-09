@@ -15,11 +15,11 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
+    <header className="sticky top-0 z-10 border-b border-white/40 bg-white/55 backdrop-blur-xl dark:border-white/8 dark:bg-zinc-950/50">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
           <span
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#16a34a] text-lg font-bold text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#22c55e] to-[#15803d] text-lg font-bold text-white shadow-md shadow-[#16a34a]/30"
             aria-hidden
           >
             W
@@ -35,7 +35,7 @@ export function Header() {
         </div>
         <div className="flex items-center gap-2">
           <div
-            className="flex rounded-lg border border-zinc-200 p-0.5 dark:border-zinc-700"
+            className="flex rounded-lg border border-white/50 bg-white/40 p-0.5 backdrop-blur-sm dark:border-white/10 dark:bg-zinc-900/40"
             role="group"
             aria-label={kamus.labelBahasa}
           >
@@ -67,7 +67,7 @@ export function Header() {
           <button
             type="button"
             onClick={toggleTema}
-            className="rounded-lg border border-zinc-200 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-lg border border-white/50 bg-white/40 px-3 py-1.5 text-sm text-zinc-700 backdrop-blur-sm transition hover:bg-white/70 dark:border-white/10 dark:bg-zinc-900/40 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
             aria-label={tema === "dark" ? kamus.temaTerang : kamus.temaGelap}
           >
             {tema === "dark" ? kamus.temaTerang : kamus.temaGelap}

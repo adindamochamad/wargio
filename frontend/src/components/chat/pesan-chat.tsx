@@ -11,8 +11,8 @@ export function PesanChat({ pesan }: { pesan: PesanUi }) {
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-2.5 sm:max-w-[75%] ${
           dariUser
-            ? "bg-[#16a34a] text-white"
-            : "border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+            ? "bg-gradient-to-br from-[#22c55e] to-[#15803d] text-white shadow-md shadow-[#16a34a]/25"
+            : "border border-white/50 bg-white/75 text-zinc-900 backdrop-blur-sm dark:border-white/10 dark:bg-zinc-900/65 dark:text-zinc-100"
         }`}
       >
         {pesan.sedangStreaming ? (

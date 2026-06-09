@@ -26,7 +26,7 @@ export function AksiCepat({
           type="button"
           disabled={nonaktif}
           onClick={() => onPilih(aksi.pesan)}
-          className="rounded-full border border-[#16a34a]/30 bg-[#16a34a]/10 px-3 py-1.5 text-xs font-medium text-[#15803d] transition hover:bg-[#16a34a]/20 disabled:opacity-50 dark:border-[#16a34a]/40 dark:text-[#4ade80]"
+          className="rounded-full border border-[#16a34a]/35 bg-[#16a34a]/12 px-3 py-1.5 text-xs font-medium text-[#15803d] backdrop-blur-sm transition hover:border-[#16a34a]/50 hover:bg-[#16a34a]/22 disabled:opacity-50 dark:border-[#4ade80]/30 dark:bg-[#16a34a]/15 dark:text-[#4ade80] dark:hover:bg-[#16a34a]/25"
         >
           {aksi.label}
         </button>

@@ -4,10 +4,16 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #fafafa;
+  --background: #f4f7f4;
   --foreground: #171717;
   --wargio-primary: #16a34a;
   --wargio-primary-hover: #15803d;
+
+  /* Mesh — mode terang: hijau segar + hangat warung */
+  --wargio-bg-base: #f2f6f2;
+  --wargio-orb-opacity: 0.55;
+  --wargio-grid-opacity: 0.35;
+  --wargio-vignette: rgba(255, 255, 255, 0.35);
 }
 
 @theme inline {
@@ -17,12 +23,222 @@
 }
 
 .dark {
-  --background: #09090b;
+  --background: #050508;
   --foreground: #fafafa;
+
+  /* Mesh — mode gelap: aurora hijau dalam */
+  --wargio-bg-base: #030306;
+  --wargio-orb-opacity: 0.42;
+  --wargio-grid-opacity: 0.22;
+  --wargio-vignette: rgba(0, 0, 0, 0.45);
 }
 
 body {
-  background: var(--background);
+  background-color: var(--wargio-bg-base);
   color: var(--foreground);
   font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+/* ——— Latar mesh dinamis ——— */
+
+.wargio-latar-dasar {
+  background-color: var(--wargio-bg-base);
+  background-image:
+    radial-gradient(
+      ellipse 90% 70% at 50% -10%,
+      color-mix(in srgb, var(--wargio-primary) 14%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 100% 50%,
+      color-mix(in srgb, #86efac 18%, transparent),
+      transparent 50%
+    );
+}
+
+.wargio-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(72px);
+  opacity: var(--wargio-orb-opacity);
+  will-change: transform;
+}
+
+.wargio-orb--satu {
+  top: -8%;
+  left: -6%;
+  width: min(52vw, 420px);
+  height: min(52vw, 420px);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--wargio-primary) 70%, #4ade80) 0%,
+    transparent 68%
+  );
+  animation: wargio-drift-satu 28s ease-in-out infinite;
+}
+
+.wargio-orb--dua {
+  top: 28%;
+  right: -10%;
+  width: min(48vw, 380px);
+  height: min(48vw, 380px);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, #34d399 55%, #a7f3d0) 0%,
+    transparent 70%
+  );
+  animation: wargio-drift-dua 32s ease-in-out infinite;
+}
+
+.wargio-orb--tiga {
+  bottom: -12%;
+  left: 18%;
+  width: min(56vw, 440px);
+  height: min(56vw, 440px);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, #fbbf24 35%, #fde68a) 0%,
+    transparent 72%
+  );
+  animation: wargio-drift-tiga 26s ease-in-out infinite;
+}
+
+.wargio-orb--empat {
+  top: 55%;
+  left: 42%;
+  width: min(40vw, 320px);
+  height: min(40vw, 320px);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, #22c55e 40%, transparent) 0%,
+    transparent 75%
+  );
+  animation: wargio-drift-empat 34s ease-in-out infinite;
+}
+
+.dark .wargio-orb--satu {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--wargio-primary) 85%, #052e16) 0%,
+    transparent 65%
+  );
+}
+
+.dark .wargio-orb--dua {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, #059669 70%, #064e3b) 0%,
+    transparent 68%
+  );
+}
+
+.dark .wargio-orb--tiga {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, #0d9488 45%, #134e4a) 0%,
+    transparent 70%
+  );
+}
+
+.dark .wargio-orb--empat {
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, #16a34a 35%, #14532d) 0%,
+    transparent 72%
+  );
+}
+
+.wargio-grid {
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--wargio-primary) 8%, transparent) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--wargio-primary) 8%, transparent) 1px,
+      transparent 1px
+    );
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 85% 75% at 50% 40%, black 15%, transparent 72%);
+  opacity: var(--wargio-grid-opacity);
+}
+
+.dark .wargio-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+}
+
+.wargio-vignette {
+  background: radial-gradient(
+    ellipse 100% 80% at 50% 50%,
+    transparent 35%,
+    var(--wargio-vignette) 100%
+  );
+}
+
+@keyframes wargio-drift-satu {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(4%, 6%) scale(1.08);
+  }
+}
+
+@keyframes wargio-drift-dua {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-5%, 4%) scale(1.06);
+  }
+}
+
+@keyframes wargio-drift-tiga {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(3%, -5%) scale(1.05);
+  }
+}
+
+@keyframes wargio-drift-empat {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-3%, -3%) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wargio-orb {
+    animation: none !important;
+  }
+}
+
+/* Panel kaca — kartu & chat */
+.wargio-panel-kaca {
+  border: 1px solid color-mix(in srgb, white 55%, transparent);
+  background: color-mix(in srgb, white 72%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--wargio-primary) 6%, transparent),
+    0 12px 40px color-mix(in srgb, #171717 4%, transparent);
+}
+
+.dark .wargio-panel-kaca {
+  border-color: color-mix(in srgb, white 8%, transparent);
+  background: color-mix(in srgb, #18181b 58%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, white 4%, transparent),
+    0 16px 48px color-mix(in srgb, black 35%, transparent);
 }

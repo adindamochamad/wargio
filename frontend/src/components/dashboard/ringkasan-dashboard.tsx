@@ -146,9 +146,16 @@ function Kartu({
         ? "border-amber-300/50"
         : "border-red-300/50";
 
+  const aksenGlow =
+    warna === "hijau"
+      ? "shadow-[#16a34a]/10 dark:shadow-[#16a34a]/15"
+      : warna === "kuning"
+        ? "shadow-amber-500/10 dark:shadow-amber-500/10"
+        : "shadow-red-500/10 dark:shadow-red-500/10";
+
   return (
     <article
-      className={`rounded-xl border bg-white p-4 shadow-sm dark:bg-zinc-900 ${border}`}
+      className={`wargio-panel-kaca rounded-xl p-4 shadow-lg ${border} ${aksenGlow}`}
     >
       <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {judul}
