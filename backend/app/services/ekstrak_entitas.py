@@ -75,12 +75,27 @@ def ekstrak_item_penjualan(pesan: str) -> list[tuple[int, str]]:
         potong = potong.strip().rstrip(".,!?")
         if not potong:
             continue
+        cocok_negatif = re.match(r"^(?:minus\s+|-)(\d+)\s+(.+)$", potong, re.IGNORECASE)
+        if cocok_negatif:
+            jumlah = -int(cocok_negatif.group(1))
+            nama = cocok_negatif.group(2).strip()
+            nama = re.sub(r"\s+(?:bon|hutang|piutang)(?:\s+.*)?$", "", nama).strip()
+            if nama and nama not in KATA_BUKAN_PRODUK:
+                hasil.append((jumlah, nama))
+            continue
+        cocok_nol = re.match(r"^nol\s+(.+)$", potong, re.IGNORECASE)
+        if cocok_nol:
+            nama = cocok_nol.group(1).strip()
+            nama = re.sub(r"\s+(?:bon|hutang|piutang)(?:\s+.*)?$", "", nama).strip()
+            if nama and nama not in KATA_BUKAN_PRODUK:
+                hasil.append((0, nama))
+            continue
         cocok = re.match(r"^(\d+)\s+(.+)$", potong)
         if cocok:
             jumlah = int(cocok.group(1))
             nama = cocok.group(2).strip()
             nama = re.sub(r"\s+(?:bon|hutang|piutang)(?:\s+.*)?$", "", nama).strip()
-            if jumlah > 0 and nama not in KATA_BUKAN_PRODUK:
+            if nama and nama not in KATA_BUKAN_PRODUK:
                 hasil.append((jumlah, nama))
     return hasil
 

@@ -50,19 +50,32 @@ python scripts/verifikasi_agentic/jalankan.py --tugas <ID> --fase stress
 - [x] Query MCP `find` stok rendah berhasil (15 docs).
 - [x] Endpoint `/api/health` return 200 + `atlas=true`.
 
-### Catatan partial (1 Juni) — selesai
-- [x] MCP verified — `scripts/verifikasi_mcp.mjs`
+### Catatan selesai (1 Juni + re-verifikasi 7 Juni 2026)
+- [x] MCP verified — `scripts/verifikasi_mcp.mjs` (stabil: `node` langsung, tanpa EPIPE)
 - [x] `0.0.0.0/0` dihapus dari Network Access
 - [x] Vector index `products_vector_index` READY (768d, `name_embedding`)
 - [x] Repo public & ter-push — `https://github.com/adindamochamad/wargio`
+- [x] Seed minimum: 52 produk, 20 customer, 239 transaksi (gate `seed_minimum`)
+- [x] README foundation: LICENSE + Live URL `https://wargio.adindamochamad.com`
 
 ### Verifikasi lokal
 
 ```bash
 backend/.venv/bin/python scripts/verifikasi_hari1.py
+# Agentic 3 fase:
+python scripts/verifikasi_agentic/jalankan.py --tugas hari1-foundation --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas hari1-foundation --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas hari1-foundation --fase stress
 ```
 
-Lolos penuh Hari 1 hanya jika semua gate hijau (termasuk Atlas + seed).
+**Status Hari 1: 100% complete** (7 Juni 2026)
+
+| Cek | Hasil |
+|-----|-------|
+| `verifikasi_hari1.py` | 17/17 LOLOS |
+| Agentic verifikasi | LOLOS (82/100) |
+| Agentic testing | LOLOS |
+| Agentic stress | LOLOS |
 
 ## Hari 2 — Tier 1 Read Intents
 
@@ -81,11 +94,35 @@ Lolos penuh Hari 1 hanya jika semua gate hijau (termasuk Atlas + seed).
 - [x] Layer MCP-equivalent tools (`atlas_tools.py`) + optional MCP live.
 - [x] Integrasi Gemini agent (fallback regex jika belum dikonfigurasi).
 - [x] API terima field `pesan` atau `message`.
-- [x] Deploy ADK agent ke Agent Engine (`agent/wargio`, ID di `.env`).
-- [x] MCP live enabled (`MCP_LIVE_ENABLED=true`, pool stdio + verifikasi).
+- [x] Deploy ADK agent ke Agent Engine (`agent/wargio`, `AGENT_ENGINE_ID` di `.env`).
+- [x] MCP live terverifikasi (`scripts/verifikasi_mcp.mjs` + optional pool `MCP_LIVE_ENABLED=true`) — *production: `false`, `pymongo_equivalent`*.
 
 ### Definition of Done
 - [x] 4 query read intent return respons masuk akal dan konsisten dengan data Atlas.
+
+### Verifikasi lokal
+
+```bash
+backend/.venv/bin/python scripts/verifikasi_hari2.py
+# Opsional MCP live pool (lambat): backend/.venv/bin/python scripts/verifikasi_mcp_live.py
+python scripts/verifikasi_agentic/jalankan.py --tugas hari2-read-intents --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas hari2-read-intents --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas hari2-read-intents --fase stress
+```
+
+**Status Hari 2: 100% complete** (8 Juni 2026)
+
+| Cek | Hasil |
+|-----|-------|
+| `verifikasi_hari2.py` | 11/11 LOLOS (4 intent + Gemini + MCP + Agent Engine) |
+| Agentic verifikasi | LOLOS 100/100 |
+| Agentic testing | LOLOS 100/100 |
+| Agentic stress | LOLOS 100/100 |
+| 4 read intent DoD | check_stock, check_debt, restock_alert, sales_report — data Atlas |
+| Gemini | Terintegrasi; fallback regex jika quota/runtime gagal (429 free tier) |
+| MCP | Standalone verified (Hari 1); production `pymongo_equivalent` by design |
+| Agent Engine | `agent/wargio` + `AGENT_ENGINE_ID=7738092906182868992` |
+| Production health | `agent_mode=regex` atau `gemini_with_regex_fallback`; `mcp_tools` + `judge_smoke` di `/api/health`; `mcp_live_enabled=false` |
 
 ## Hari 3 — Tier 1 Write + Tier 2 Dasar
 
@@ -111,9 +148,24 @@ Lolos penuh Hari 1 hanya jika semua gate hijau (termasuk Atlas + seed).
 ```bash
 backend/.venv/bin/python scripts/verifikasi_hari3.py
 # atau: npm run verifikasi:hari3
+python scripts/verifikasi_agentic/jalankan.py --tugas hari3-write-intents --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas hari3-write-intents --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas hari3-write-intents --fase stress
 ```
 
-Lolos penuh Hari 3 jika semua gate hijau (termasuk `pytest tests/test_hari3.py`).
+**Status Hari 3: 100% complete** (7 Juni 2026)
+
+| Cek | Hasil |
+|-----|-------|
+| `verifikasi_hari3.py` | 9/9 LOLOS |
+| `pytest tests/test_hari3.py` | lulus (termasuk qty negatif + stok kurang) |
+| Agentic verifikasi | LOLOS |
+| Agentic testing | LOLOS |
+| Agentic stress | LOLOS (fix `balasan` + parse `minus N`) |
+| Race stok konfirmasi | Conditional `$gte` + test `test_konfirmasi_stok_berubah_ditolak` |
+| Qty 0 / nol | Pesan "Jumlah tidak valid" (bukan "format kurang jelas") |
+| Fuzzy produk pipeline | `fuzzy_produk.py` — exact → partial → vector (`gemini-embedding-001`) |
+| Embedding Atlas | `scripts/isi_embedding_produk.py` — 52 produk `name_embedding` |
 
 ## Hari 4 — Frontend MVP
 
@@ -142,9 +194,25 @@ cd backend && uvicorn app.main:aplikasi --reload --port 8000
 cd frontend && npm run dev
 
 backend/.venv/bin/python scripts/verifikasi_hari4.py
-# atau: npm run verifikasi:hari4
-# Gate: build, vitest, runtime /api/dashboard + 4 intent + CORS
+# Opsional production UI (jika deploy sudah hidup):
+# export WARGIO_PUBLIC_URL=https://wargio.adindamochamad.com
+python scripts/verifikasi_agentic/jalankan.py --tugas hari4-frontend --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas hari4-frontend --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas hari4-frontend --fase stress
 ```
+
+**Status Hari 4: 100% complete** (8 Juni 2026)
+
+| Cek | Hasil |
+|-----|-------|
+| `verifikasi_hari4.py` | LOLOS (struktur + build + vitest + runtime 4 intent + CORS + UI fitur) |
+| Agentic verifikasi | LOLOS 100/100 (`dashboard_route`, `frontend_ui_fitur`) |
+| Agentic testing | LOLOS 100/100 (pytest health + vitest) |
+| Agentic stress | LOLOS 100/100 (CORS + timeout 90s + production UI) |
+| Quick actions | Cek Stok, Lihat Hutang, Laporan Hari Ini, Restock |
+| Dashboard mini | `/api/dashboard` — stok kritis, hutang, transaksi hari ini |
+| Dark mode + mobile | `tema-provider` + `max-w-6xl` + kelas `dark:` |
+| Production | `https://wargio.adindamochamad.com/` 200 + 4 intent via same-origin `/api` |
 
 ### Mitigasi risiko (Hari 4)
 - [x] Parsing error FastAPI `detail` array di `api.ts`
@@ -166,26 +234,45 @@ backend/.venv/bin/python scripts/verifikasi_hari4.py
 - [x] Smoke test `scripts/smoke_production.sh` (+ 4 intent Tier 1 + atlas check).
 - [x] Verifikasi `scripts/verifikasi_hari5.py`.
 - [x] Skrip orkestrator Hari 5 (`selesaikan_hari5.sh`, `siapkan_env_production.sh`, `deploy_ssh.sh`, `pasang_nginx_vps.sh`, `cek_ip_vps_atlas.sh`, `jalankan_k6_production.sh`).
-- [ ] Deploy di VPS Anda (`scripts/deploy_vps.sh` atau `deploy_ssh.sh`).
-- [ ] Nginx + SSL (Let's Encrypt) — `pasang_nginx_vps.sh`.
-- [ ] Atlas Network Access: allowlist IP VPS — `cek_ip_vps_atlas.sh`.
-- [ ] Isi Live URL di README & Devpost.
-- [ ] Smoke production: `WARGIO_PRODUCTION_URL=... bash scripts/smoke_production.sh`.
-- [ ] (Opsional) k6 10 user — `bash scripts/jalankan_k6_production.sh` → `docs/hari5-load-test.md`.
+- [x] Deploy di VPS Anda (`scripts/deploy_vps.sh` atau `deploy_ssh.sh`).
+- [x] Nginx + SSL (Let's Encrypt) — `pasang_nginx_vps.sh`.
+- [x] Atlas Network Access: allowlist IP VPS — `cek_ip_vps_atlas.sh` (IP `45.76.156.99/32`, `atlas=true`).
+- [x] Isi Live URL di README (`https://wargio.adindamochamad.com`).
+- [x] Live URL Devpost siap — `docs/devpost-submission.md` (field **Project URL**); paste ke form saat login Devpost.
+- [x] Smoke production: `WARGIO_PRODUCTION_URL=... bash scripts/smoke_production.sh`.
+- [x] (Opsional) k6 10 user — `bash scripts/jalankan_k6_production.sh` → `docs/hari5-load-test.md`.
 
 ### Definition of Done
-- [ ] URL production HTTPS bisa diakses incognito (`/api/health` 200, `atlas=true`).
-- [ ] UI + 4 intent Tier 1 jalan di domain production.
-- [ ] p95 response time < 5 detik untuk 10 concurrent users (uji awal, opsional).
+- [x] URL production HTTPS bisa diakses incognito (`/api/health` 200, `atlas=true`).
+- [x] UI + 4 intent Tier 1 jalan di domain production.
+- [x] p95 response time < 5 detik untuk 10 concurrent users (uji awal, opsional) — **p95 2.84s** (lihat `docs/hari5-load-test.md`).
+
+### Catatan selesai (7 Juni 2026)
+- Frontend port host **3010** (bentrok `:3000` dengan hermes-gateway).
+- Atlas allowlist VPS `45.76.156.99/32`.
 
 ### Verifikasi
 
 ```bash
+export WARGIO_PRODUCTION_URL=https://wargio.adindamochamad.com
 backend/.venv/bin/python scripts/verifikasi_hari5.py
-# Setelah deploy:
-export WARGIO_PRODUCTION_URL=https://domain-anda.com
 bash scripts/smoke_production.sh
+python scripts/verifikasi_agentic/jalankan.py --tugas hari5-deploy --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas hari5-deploy --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas hari5-deploy --fase stress
 ```
+
+**Status Hari 5: 100% complete** (8 Juni 2026)
+
+| Cek | Hasil |
+|-----|-------|
+| `verifikasi_hari5.py` | LOLOS (artifact + docker/nginx + rate limit + HTTPS + smoke + k6 doc) |
+| Agentic verifikasi | LOLOS 100/100 (`artifact_docker`, `nginx_template`, `readme_live_url_demo`, `k6_dokumentasi`) |
+| Agentic testing | LOLOS 100/100 (`tests/test_health.py`) |
+| Agentic stress | LOLOS 100/100 (health + smoke 4 intent + UI + k6 p95 2.84s) |
+| Production HTTPS | `https://wargio.adindamochamad.com` — health `atlas=true` |
+| Load test | 10 VU, p95 **2.84s** < 5s (`docs/hari5-load-test.md`) |
+| Devpost Live URL | Siap di `docs/devpost-submission.md` — submit form lengkap **Hari 8** |
 
 ## Hari 6 — Testing Blitz & Hardening
 
@@ -193,23 +280,50 @@ bash scripts/smoke_production.sh
 - Turunkan risiko demo gagal.
 
 ### Todo
-- [ ] Jalankan unit/integration/e2e test.
-- [ ] Kejar coverage backend >= 80%.
-- [ ] Jalankan k6 untuk skenario 10 concurrent users.
-- [ ] Uji edge case: input kosong, qty 0/negatif, nama ambigu, MCP timeout.
-- [ ] Uji isolasi sesi 2 tab berbeda.
-- [ ] Rapikan error message agar natural Bahasa Indonesia.
+- [x] Jalankan unit/integration/e2e test.
+- [x] Kejar coverage backend >= 80%.
+- [x] Jalankan k6 untuk skenario 10 concurrent users.
+- [x] Uji edge case: input kosong, qty 0/negatif, nama ambigu, MCP timeout.
+- [x] Uji isolasi sesi 2 tab berbeda.
+- [x] Rapikan error message agar natural Bahasa Indonesia.
 
 ### Definition of Done
-- [ ] Tidak ada bug kritis terbuka.
-- [ ] Hasil test dan load test terdokumentasi.
+- [x] Tidak ada bug kritis terbuka.
+- [x] Hasil test dan load test terdokumentasi.
+
+### Verifikasi
+
+```bash
+backend/.venv/bin/python scripts/verifikasi_hari6.py
+python scripts/verifikasi_agentic/jalankan.py --tugas hari6-hardening --fase verifikasi
+python scripts/verifikasi_agentic/jalankan.py --tugas hari6-hardening --fase testing
+python scripts/verifikasi_agentic/jalankan.py --tugas hari6-hardening --fase stress
+```
+
+**Status Hari 6: 100% complete (jujur)** (9 Juni 2026)
+
+| Cek | Hasil |
+|-----|-------|
+| `verifikasi_hari6.py` | pytest+coverage single run + vitest coverage + docs |
+| Agentic verifikasi | LOLOS **100/100** |
+| Agentic testing | LOLOS **100/100** (coverage backend 83%) |
+| Agentic stress | LOLOS **100/100** (`mcp_fallback_pesan` = unit executor + chat) |
+| pytest | **108 passed**, 0 failed |
+| Coverage backend | **83%** full repo (tanpa omit) |
+| Coverage frontend | **95%** `src/lib/**` |
+| vitest | **14 passed** |
+| k6 | p95 **2.84s** — `docs/hari5-load-test.md` |
+| Bug fix | `test_check_stock_produk_kritis_status` — query nama lengkap Aqua 600ml |
 
 ## Hari 7 — Produksi Demo Video
+
+> **Panduan lengkap:** [`docs/hari7-demo-video.md`](./hari7-demo-video.md) — Gamma prompt, ElevenLabs VO, screen record, CapCut.
 
 ### Target Hari Ini
 - Video final siap upload.
 
 ### Todo
+- [x] Jalankan `bash scripts/rehearsal_demo_video.sh` sebelum rekam (LOLOS production 9 Juni 2026).
 - [ ] Rekam demo 3 menit sesuai script.
 - [ ] Pastikan ada scene Atlas dashboard terlihat.
 - [ ] Tampilkan 4 skenario utama: stock, sale, debt, sales insight.
@@ -225,14 +339,18 @@ bash scripts/smoke_production.sh
 - Submission aman, lengkap, dan tepat waktu.
 
 ### Todo
-- [ ] Final audit checklist teknis dan submission.
-- [ ] Pastikan repo public.
-- [ ] Verifikasi MIT license terdeteksi.
-- [ ] Isi form Devpost lengkap (track MongoDB, URL live, repo, video).
-- [ ] Submit maksimal H-1 deadline.
+- [x] Final audit checklist teknis (`bash scripts/judge_verify.sh` — 8 intent + write + EN).
+- [x] Dokumen Devpost siap salin (`docs/devpost-submission.md`).
+- [x] CI GitHub Actions (pytest + vitest, `.github/workflows/ci.yml`).
+- [x] README judge path + arsitektur + `npm run judge:verify`.
+- [ ] Pastikan repo public (cek GitHub settings).
+- [ ] Verifikasi MIT license terdeteksi di GitHub.
+- [ ] Isi form Devpost lengkap (track MongoDB, URL live, repo, **video YouTube**).
+- [ ] Submit maksimal H-1 deadline (10 Juni 2026).
 
 ### Definition of Done
 - [ ] Submission terkirim dan semua link dapat diakses judge.
+- [ ] Video demo ≤3 menit + subtitle EN (lihat Hari 7).
 
 ## Checklist Harian Cepat (Daily Standup)
 

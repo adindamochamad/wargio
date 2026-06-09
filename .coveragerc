@@ -1,0 +1,7 @@
+[run]
+# Semua modul backend dihitung — mcp_klien pool stdio ditest via mock unit
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:

@@ -34,6 +34,27 @@ def catat_lolos(pesan: str) -> None:
     print(f"  OK: {pesan}")
 
 
+def gate_ui_fitur() -> None:
+    print("\n[GATE] Fitur UI Hari 4")
+    cek = [
+        (FRONTEND / "src" / "components" / "chat" / "aksi-cepat.tsx", "Cek Stok"),
+        (FRONTEND / "src" / "components" / "chat" / "aksi-cepat.tsx", "Lihat Hutang"),
+        (FRONTEND / "src" / "components" / "chat" / "aksi-cepat.tsx", "Laporan Hari Ini"),
+        (FRONTEND / "src" / "components" / "layout" / "header.tsx", "Gelap"),
+        (FRONTEND / "src" / "components" / "chat" / "chat-wargio.tsx", "sedangKirim"),
+        (FRONTEND / "src" / "components" / "chat" / "chat-wargio.tsx", "pesanError"),
+        (FRONTEND / "src" / "app" / "page.tsx", "max-w-6xl"),
+    ]
+    for path, kata in cek:
+        if not path.exists():
+            catat_gagal(f"Hilang: {path.relative_to(ROOT)}")
+            continue
+        if kata not in path.read_text(encoding="utf-8"):
+            catat_gagal(f"{path.relative_to(ROOT)} tanpa fitur '{kata}'")
+        else:
+            catat_lolos(f"{path.relative_to(ROOT).as_posix()} — {kata}")
+
+
 def gate_struktur() -> None:
     print("\n[GATE] Struktur frontend")
     wajib = [
@@ -95,6 +116,36 @@ def gate_vitest() -> None:
         catat_gagal(f"vitest gagal: {hasil.stdout[-300:] or hasil.stderr[-300:]}")
         return
     catat_lolos("vitest lulus")
+
+
+async def gate_production_ui() -> None:
+    url = (
+        os.getenv("WARGIO_PRODUCTION_URL", "").strip()
+        or os.getenv("WARGIO_PUBLIC_URL", "").strip()
+    ).rstrip("/")
+    print(f"\n[GATE] Production UI ({url or 'tidak diset'})")
+    if not url:
+        catat_lolos("Production URL tidak diset — lewati (dev lokal cukup)")
+        return
+    try:
+        import httpx
+    except ImportError:
+        catat_gagal("httpx tidak terpasang")
+        return
+    try:
+        async with httpx.AsyncClient(base_url=url, timeout=90.0) as klien:
+            root = await klien.get("/")
+            if root.status_code != 200:
+                catat_gagal(f"GET / HTTP {root.status_code}")
+                return
+            catat_lolos(f"Frontend production {url}/ → 200")
+            d = await klien.get("/api/dashboard")
+            if d.status_code != 200:
+                catat_gagal(f"/api/dashboard production {d.status_code}")
+                return
+            catat_lolos("Production /api/dashboard 200")
+    except Exception as e:
+        catat_gagal(f"Production UI: {e}")
 
 
 async def gate_runtime_api() -> None:
@@ -179,10 +230,12 @@ async def gate_runtime_api() -> None:
 async def main() -> None:
     print("=== Verifikasi Hari 4 Wargio ===")
     gate_struktur()
+    gate_ui_fitur()
     gate_env_mcp()
     gate_build()
     gate_vitest()
     await gate_runtime_api()
+    await gate_production_ui()
 
     print("\n=== Ringkasan ===")
     print(f"Lolos: {len(LOLOS)} | Gagal: {len(GAGAL)}")

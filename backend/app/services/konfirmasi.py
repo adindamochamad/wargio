@@ -9,6 +9,7 @@ from typing import Any, Optional
 from pymongo.asynchronous.database import AsyncDatabase
 
 from app.services.sesi import ambil_context, set_context
+from app.util.lokalisasi import label_metode_bayar, t
 
 # Draft write kedaluwarsa setelah 30 menit tanpa konfirmasi
 BATAS_KEDALUWARSA_PENDING = timedelta(minutes=30)
@@ -18,6 +19,7 @@ KATA_KONFIRMASI = frozenset({
     "ya", "iya", "ok", "oke", "setuju", "lanjut", "lanjutkan",
     "konfirmasi", "benar", "betul", "sip", "yoi", "gas", "jadi",
     "yap", "yep", "iyalah", "yasudah", "ya sudah",
+    "yes", "confirm", "confirmed", "sure", "go ahead",
 })
 KATA_BATAL = frozenset({
     "tidak", "batal", "cancel", "gak jadi", "ga jadi", "jangan",
@@ -106,16 +108,25 @@ def format_ringkasan_penjualan(draft: dict[str, Any]) -> str:
             f"@ {format_rupiah(item['price'])} = {format_rupiah(item['subtotal'])}"
         )
     total_teks = format_rupiah(draft["total"])
-    metode = draft.get("payment_method", "tunai")
+    metode = label_metode_bayar(draft.get("payment_method", "tunai"))
     baris_customer = ""
-    if metode == "hutang" and draft.get("customer_name"):
-        baris_customer = f"\nCustomer: **{draft['customer_name']}** (bon/hutang)\n"
+    if draft.get("payment_method") == "hutang" and draft.get("customer_name"):
+        baris_customer = t(
+            f"\nCustomer: **{draft['customer_name']}** (bon/hutang)\n",
+            f"\nCustomer: **{draft['customer_name']}** (on credit)\n",
+        )
     return (
-        "Konfirmasi penjualan ini, Bu/Pak?\n"
+        t(
+            "Konfirmasi penjualan ini, Bu/Pak?\n",
+            "Confirm this sale?\n",
+        )
         + "\n".join(baris)
         + f"\n\n**Total: {total_teks}** ({metode})"
         + baris_customer
-        + "\n\nBalas **ya** untuk mencatat, atau **batal** untuk membatalkan."
+        + t(
+            "\n\nBalas **ya** untuk mencatat, atau **batal** untuk membatalkan.",
+            "\n\nReply **yes** to record, or **cancel** to abort.",
+        )
     )
 
 
@@ -125,8 +136,14 @@ def format_ringkasan_pembayaran(draft: dict[str, Any]) -> str:
     jumlah = format_rupiah(draft["amount"])
     sisa = format_rupiah(draft["debt_after"])
     return (
-        f"Konfirmasi pembayaran hutang **{draft['customer_name']}**?\n"
-        f"  - Jumlah bayar: **{jumlah}**\n"
-        f"  - Sisa hutang setelah bayar: **{sisa}**\n\n"
-        "Balas **ya** untuk mencatat, atau **batal** untuk membatalkan."
+        t(
+            f"Konfirmasi pembayaran hutang **{draft['customer_name']}**?\n"
+            f"  - Jumlah bayar: **{jumlah}**\n"
+            f"  - Sisa hutang setelah bayar: **{sisa}**\n\n"
+            "Balas **ya** untuk mencatat, atau **batal** untuk membatalkan.",
+            f"Confirm debt payment for **{draft['customer_name']}**?\n"
+            f"  - Payment amount: **{jumlah}**\n"
+            f"  - Remaining debt: **{sisa}**\n\n"
+            "Reply **yes** to record, or **cancel** to abort.",
+        )
     )

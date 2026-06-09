@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Toggle manual .dark di <html> — default v4 pakai prefers-color-scheme saja */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #fafafa;
   --foreground: #171717;

@@ -229,5 +229,11 @@ async def test_health_menampilkan_agent_mode() -> None:
         res = await klien.get("/api/health")
     assert res.status_code == 200
     data = res.json()
-    assert data["agent_mode"] in ("gemini", "intent_engine")
+    assert data["agent_mode"] in (
+        "gemini",
+        "intent_engine",
+        "gemini_with_regex_fallback",
+        "regex",
+    )
+    assert "mcp_tools" in data
     assert "mcp_mode" in data

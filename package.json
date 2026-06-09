@@ -14,6 +14,8 @@
     "hari5": "bash scripts/selesaikan_hari5.sh all",
     "hari5:env": "bash scripts/siapkan_env_production.sh",
     "hari5:smoke": "bash scripts/smoke_production.sh",
+    "judge:verify": "bash scripts/judge_verify.sh",
+    "rehearsal:video": "bash scripts/rehearsal_demo_video.sh",
     "hari5:k6": "bash scripts/jalankan_k6_production.sh",
     "hari1": "bash scripts/jalankan_hari1.sh"
   },

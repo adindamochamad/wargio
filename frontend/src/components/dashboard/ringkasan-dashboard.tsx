@@ -1,14 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBahasa } from "@/components/providers/bahasa-provider";
 import { ambilDashboard, KesalahanApi } from "@/lib/api";
 import { formatRupiah } from "@/lib/format";
 import type { ResponsDashboard } from "@/types/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function RingkasanDashboard() {
-  const [data, setData] = useState<ResponsDashboard | null>(null);
-  const [sedangMemuat, setSedangMemuat] = useState(true);
+export function RingkasanDashboard({
+  dataAwal = null,
+}: {
+  dataAwal?: ResponsDashboard | null;
+}) {
+  const { kamus } = useBahasa();
+  const [data, setData] = useState<ResponsDashboard | null>(dataAwal);
+  const [sedangMemuat, setSedangMemuat] = useState(!dataAwal);
   const [pesanError, setPesanError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -26,11 +32,7 @@ export function RingkasanDashboard() {
           let pesan =
             e instanceof KesalahanApi
               ? e.message
-              : "Tidak bisa memuat dashboard.";
-          if (e instanceof KesalahanApi && e.statusKode === 404) {
-            pesan +=
-              " Restart backend: uvicorn app.main:aplikasi --reload --port 8000";
-          }
+              : kamus.gagalMuatDashboard;
           setPesanError(pesan);
           setData(null);
         }
@@ -44,11 +46,15 @@ export function RingkasanDashboard() {
     return () => {
       dibatalkan = true;
     };
-  }, []);
+  }, [kamus.gagalMuatDashboard]);
 
   if (sedangMemuat) {
     return (
-      <section className="grid gap-3 sm:grid-cols-3" aria-busy="true">
+      <section
+        className="grid gap-3 sm:grid-cols-3"
+        aria-busy="true"
+        aria-label={kamus.memuatRingkasan}
+      >
         <Skeleton className="h-28" />
         <Skeleton className="h-28" />
         <Skeleton className="h-28" />
@@ -74,14 +80,14 @@ export function RingkasanDashboard() {
                 setPesanError(
                   err instanceof KesalahanApi
                     ? err.message
-                    : "Gagal memuat ulang.",
+                    : kamus.gagalMuatDashboard,
                 );
               })
               .finally(() => setSedangMemuat(false));
           }}
           className="mt-2 text-xs font-medium underline"
         >
-          Muat ulang
+          {kamus.muatUlang}
         </button>
       </div>
     );
@@ -94,7 +100,7 @@ export function RingkasanDashboard() {
   return (
     <section className="grid gap-3 sm:grid-cols-3">
       <Kartu
-        judul="Stok kritis"
+        judul={kamus.stokKritis}
         nilai={String(data.jumlah_produk_kritis)}
         sub={
           data.stok_kritis.length > 0
@@ -102,20 +108,20 @@ export function RingkasanDashboard() {
                 .slice(0, 2)
                 .map((p) => `${p.nama} (${p.stok_saat_ini})`)
                 .join(", ")
-            : "Semua aman"
+            : kamus.semuaAman
         }
         warna="merah"
       />
       <Kartu
-        judul="Total hutang"
+        judul={kamus.totalHutang}
         nilai={formatRupiah(data.total_hutang_aktif)}
-        sub={`${data.jumlah_customer_berhutang} pelanggan`}
+        sub={`${data.jumlah_customer_berhutang} ${kamus.pelanggan}`}
         warna="kuning"
       />
       <Kartu
-        judul="Penjualan hari ini"
+        judul={kamus.penjualanHariIni}
         nilai={formatRupiah(data.omzet_hari_ini)}
-        sub={`${data.jumlah_transaksi_hari_ini} transaksi`}
+        sub={`${data.jumlah_transaksi_hari_ini} ${kamus.transaksi}`}
         warna="hijau"
       />
     </section>
@@ -144,9 +150,9 @@ function Kartu({
     <article
       className={`rounded-xl border bg-white p-4 shadow-sm dark:bg-zinc-900 ${border}`}
     >
-      <h2 className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {judul}
-      </h2>
+      </p>
       <p className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
         {nilai}
       </p>

@@ -23,7 +23,11 @@ tugas:
     hari: 2
     label: "Tier 1 Read Intents"
     verifikasi_script: scripts/verifikasi_hari2.py
-    gates_tambahan: [modul_intent_handlers, gemini_atau_regex]
+    gates_tambahan:
+      - modul_intent_handlers
+      - gemini_atau_regex
+      - agent_engine_id
+      - mcp_standalone
     pytest:
       - tests/test_intents_hari2.py
       - tests/test_klasifikasi.py
@@ -49,25 +53,30 @@ tugas:
     hari: 4
     label: "Frontend MVP"
     verifikasi_script: scripts/verifikasi_hari4.py
-    gates_tambahan: [build_next, dashboard_route]
+    gates_tambahan: [dashboard_route, frontend_ui_fitur]
     pytest: [tests/test_health.py]
     vitest: true
-    stress: [cors_preflight, chat_timeout_ui]
+    stress: [cors_preflight, chat_timeout_ui, production_ui]
 
   hari5-deploy:
     hari: 5
     label: "Deploy & Production"
     verifikasi_script: scripts/verifikasi_hari5.py
-    gates_tambahan: [artifact_docker, nginx_template]
-    pytest: []
+    gates_tambahan:
+      - artifact_docker
+      - nginx_template
+      - readme_live_url_demo
+      - k6_dokumentasi
+      - devpost_live_url_siap
+    pytest: [tests/test_health.py]
     vitest: false
-    stress: [load_k6_ringan, health_production]
+    stress: [health_production, smoke_production_full, load_k6_ringan]
 
   hari6-hardening:
     hari: 6
     label: "Testing Blitz & Hardening"
-    verifikasi_script: null
-    gates_tambahan: [coverage_backend, struktur_test]
+    verifikasi_script: scripts/verifikasi_hari6.py
+    gates_tambahan: []
     pytest: [tests/]
     vitest: true
     stress:

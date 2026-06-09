@@ -133,20 +133,19 @@ def gate_mcp_dokumentasi() -> None:
     import subprocess
 
     root = Path(__file__).resolve().parents[1]
+    skrip_mcp = root / "scripts" / "verifikasi_mcp.mjs"
+    # stdout/stderr ke DEVNULL — pipe ke parent memicu EPIPE pada MCP stdio transport
     hasil = subprocess.run(
-        ["npm", "run", "verifikasi:mcp"],
+        ["node", str(skrip_mcp)],
         cwd=root,
-        capture_output=True,
-        text=True,
-        timeout=120,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=180,
     )
     if hasil.returncode != 0:
-        catat_gagal(f"MCP verifikasi gagal: {hasil.stderr[:200] or hasil.stdout[:200]}")
+        catat_gagal(f"MCP verifikasi exit {hasil.returncode} — jalankan: node scripts/verifikasi_mcp.mjs")
         return
-    if "OK: MCP find stok rendah berhasil" in hasil.stdout:
-        catat_lolos("MCP find products stok rendah berhasil")
-    else:
-        catat_gagal("Output MCP tidak sesuai")
+    catat_lolos("MCP find products stok rendah berhasil")
 
 
 async def gate_vector_index() -> None:

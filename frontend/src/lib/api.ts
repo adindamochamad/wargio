@@ -1,5 +1,6 @@
 /** Klien HTTP ke FastAPI Wargio */
 
+import { ambilKodeBahasa } from "@/lib/bahasa";
 import type { PermintaanChat, ResponsChat } from "@/types/chat";
 import type { ResponsDashboard } from "@/types/dashboard";
 
@@ -53,6 +54,7 @@ async function permintaan<T>(
     signal: sinyal,
     headers: {
       "Content-Type": "application/json",
+      "X-Wargio-Language": ambilKodeBahasa(),
       ...opsi?.headers,
     },
   });

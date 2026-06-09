@@ -35,9 +35,24 @@ services:
       dockerfile: deploy/docker/Dockerfile.frontend
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    environment:
+      API_INTERNAL_URL: http://api:8000
     restart: unless-stopped
     depends_on:
       api:
         condition: service_healthy
     ports:
-      - "127.0.0.1:3000:3000"
+      # Host 3010 — hindari bentrok dengan layanan lain di :3000 (mis. hermes-gateway)
+      - "127.0.0.1:3010:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s

@@ -34,7 +34,7 @@ Definisi JSON untuk Atlas CLI: `scripts/products_vector_index.json`.
 
 > **M0:** Satu slot FTS per cluster. Opsi `--bebaskan-slot-sample` hanya menghapus indeks bawaan `sample_mflix.movies/default`, bukan data Wargio.
 
-Embedding `name_embedding` diisi saat pipeline fuzzy match (Hari 2+). Hari 1 cukup index status **READY**.
+Embedding `name_embedding` diisi via `python scripts/isi_embedding_produk.py` (butuh `GEMINI_API_KEY`, model `gemini-embedding-001`). Hari 1 cukup index status **READY**.
 
 ## 4. MongoDB MCP Server
 

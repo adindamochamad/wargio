@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" role="img" aria-label="Wargio">
+  <rect width="180" height="180" rx="40" fill="#16a34a"/>
+  <path
+    fill="#ffffff"
+    d="M40.5 126 58.5 57.5h9l18 43.875L103.5 57.5h9L130.5 126h-11.8l-9-35.2-17.4 42h-7.9l-17.4-42-9 35.2H40.5z"
+  />
+</svg>

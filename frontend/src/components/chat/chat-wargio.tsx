@@ -1,26 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useBahasa } from "@/components/providers/bahasa-provider";
 import { kirimChat, KesalahanApi } from "@/lib/api";
 import { ambilIdSesi, resetIdSesi, simpanIdSesi } from "@/lib/sesi";
 import type { PesanUi } from "@/types/chat";
 import { AksiCepat } from "./aksi-cepat";
 import { PesanChat } from "./pesan-chat";
 
-const PESAN_SELAMAT_DATANG: PesanUi = {
-  id: "selamat-datang",
-  peran: "assistant",
-  isi:
-    "Halo, Bu/Pak! Saya Wargio — siap bantu cek stok, hutang, dan catat penjualan. " +
-    "Tanya apa saja dalam Bahasa Indonesia, atau pakai tombol cepat di bawah.",
-};
-
 export function ChatWargio({
   onTransaksiSelesai,
 }: {
   onTransaksiSelesai?: () => void;
 }) {
-  const [pesanDaftar, setPesanDaftar] = useState<PesanUi[]>([PESAN_SELAMAT_DATANG]);
+  const { kamus } = useBahasa();
+  const [pesanDaftar, setPesanDaftar] = useState<PesanUi[]>([]);
   const [inputTeks, setInputTeks] = useState("");
   const [sedangKirim, setSedangKirim] = useState(false);
   const [pesanError, setPesanError] = useState<string | null>(null);
@@ -28,6 +22,25 @@ export function ChatWargio({
     typeof window !== "undefined" ? ambilIdSesi() : "",
   );
   const bawahRef = useRef<HTMLDivElement>(null);
+
+  // Perbarui sambutan saat bahasa berganti (hanya jika belum ada percakapan user)
+  useEffect(() => {
+    setPesanDaftar((sebelum) => {
+      const hanyaSambutan =
+        sebelum.length === 0 ||
+        (sebelum.length === 1 && sebelum[0].id === "selamat-datang");
+      if (!hanyaSambutan) {
+        return sebelum;
+      }
+      return [
+        {
+          id: "selamat-datang",
+          peran: "assistant",
+          isi: kamus.pesanSelamatDatang,
+        },
+      ];
+    });
+  }, [kamus.pesanSelamatDatang]);
 
   useEffect(() => {
     bawahRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -77,23 +90,21 @@ export function ChatWargio({
         const intentWrite =
           res.intent === "record_sale" || res.intent === "record_payment";
         const suksesWrite =
-          res.balasan.toLowerCase().includes("berhasil dicatat");
+          res.balasan.toLowerCase().includes("berhasil") ||
+          res.balasan.toLowerCase().includes("successfully") ||
+          res.balasan.toLowerCase().includes("recorded");
         if (intentWrite && suksesWrite) {
           onTransaksiSelesai?.();
         }
       } catch (e) {
-        let pesan = "Ada gangguan teknis. Coba lagi sebentar ya.";
+        let pesan = kamus.gangguanTeknis;
         if (e instanceof KesalahanApi) {
           pesan = e.message;
-          if (e.statusKode === 404) {
-            pesan += " Pastikan backend sudah di-restart (port 8000).";
-          }
         } else if (
           e instanceof DOMException &&
           (e.name === "TimeoutError" || e.name === "AbortError")
         ) {
-          pesan =
-            "Permintaan terlalu lama. Matikan MCP_LIVE_ENABLED di .env atau coba lagi.";
+          pesan = kamus.timeoutChat;
         }
         setPesanError(pesan);
         setPesanDaftar((sebelum) =>
@@ -107,7 +118,7 @@ export function ChatWargio({
         setSedangKirim(false);
       }
     },
-    [idSesi, onTransaksiSelesai, sedangKirim],
+    [idSesi, kamus, onTransaksiSelesai, sedangKirim],
   );
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -118,7 +129,13 @@ export function ChatWargio({
   const handleResetSesi = () => {
     const baru = resetIdSesi();
     setIdSesi(baru);
-    setPesanDaftar([PESAN_SELAMAT_DATANG]);
+    setPesanDaftar([
+      {
+        id: "selamat-datang",
+        peran: "assistant",
+        isi: kamus.pesanSelamatDatang,
+      },
+    ]);
     setPesanError(null);
   };
 
@@ -126,14 +143,14 @@ export function ChatWargio({
     <div className="flex min-h-[420px] flex-col rounded-xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2 dark:border-zinc-800">
         <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-          Chat
+          {kamus.chat}
         </span>
         <button
           type="button"
           onClick={handleResetSesi}
           className="text-xs text-zinc-500 underline hover:text-zinc-800 dark:hover:text-zinc-200"
         >
-          Sesi baru
+          {kamus.sesiBaru}
         </button>
       </div>
 
@@ -165,18 +182,18 @@ export function ChatWargio({
             type="text"
             value={inputTeks}
             onChange={(e) => setInputTeks(e.target.value)}
-            placeholder="Tanya stok, hutang, atau catat jualan..."
+            placeholder={kamus.placeholderChat}
             disabled={sedangKirim}
             maxLength={2000}
             className="flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm outline-none focus:border-[#16a34a] focus:ring-1 focus:ring-[#16a34a] disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-            aria-label="Pesan ke Wargio"
+            aria-label={kamus.placeholderChat}
           />
           <button
             type="submit"
             disabled={sedangKirim || !inputTeks.trim()}
-            className="rounded-lg bg-[#16a34a] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#15803d] disabled:opacity-50"
+            className="rounded-lg bg-[#16a34a] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#15803d] disabled:cursor-not-allowed disabled:bg-zinc-400 disabled:text-zinc-100 dark:disabled:bg-zinc-600"
           >
-            {sedangKirim ? "..." : "Kirim"}
+            {sedangKirim ? kamus.mengirim : kamus.kirim}
           </button>
         </form>
       </div>

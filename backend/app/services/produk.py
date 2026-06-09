@@ -8,6 +8,7 @@ from typing import Any, Optional
 from pymongo.asynchronous.database import AsyncDatabase
 
 from app.services.atlas_tools import mcp_find
+from app.services.fuzzy_produk import resolve_produk_fuzzy
 
 
 async def cari_produk(
@@ -15,7 +16,7 @@ async def cari_produk(
     kata_kunci: str,
     batas: int = 3,
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    """Cari produk by nama atau alias (partial match)."""
+    """Cari produk by nama atau alias (partial match regex)."""
     teks = kata_kunci.lower().strip()
     if not teks:
         return [], []
@@ -33,13 +34,5 @@ async def resolve_produk_tunggal(
     db: AsyncDatabase,
     kata_kunci: Optional[str],
 ) -> tuple[Optional[dict[str, Any]], list[dict[str, Any]], list[str]]:
-    """Resolve satu produk. Jika ambigu return (None, opsi, aksi)."""
-    if not kata_kunci:
-        return None, [], []
-
-    hasil, aksi = await cari_produk(db, kata_kunci, batas=5)
-    if len(hasil) == 1:
-        return hasil[0], [], aksi
-    if len(hasil) > 1:
-        return None, hasil[:3], aksi
-    return None, [], aksi
+    """Resolve satu produk via pipeline fuzzy (Section 6B)."""
+    return await resolve_produk_fuzzy(db, kata_kunci)

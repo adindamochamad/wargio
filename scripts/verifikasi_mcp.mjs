@@ -76,7 +76,7 @@ async function main() {
 
   console.log("OK: MCP find stok rendah berhasil");
   console.log(teks.slice(0, 400));
-  await klien.close();
+  // Biarkan proses keluar natural — explicit close sering memicu EPIPE di subprocess
   process.exit(0);
 }
 

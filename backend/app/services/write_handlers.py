@@ -24,6 +24,16 @@ from app.services.konfirmasi import (
 from app.services.produk import resolve_produk_tunggal
 from app.services.transaksi_atomik import jalankan_dalam_transaksi
 from app.util.format import format_rupiah
+from app.util.lokalisasi import label_metode_bayar, t
+
+
+class StokKonfirmasiGagal(Exception):
+    """Stok berubah setelah draft — konfirmasi tidak boleh menulis ke Atlas."""
+
+    def __init__(self, nama_produk: str, qty_diminta: int, stok_tersedia: int | None = None) -> None:
+        self.nama_produk = nama_produk
+        self.qty_diminta = qty_diminta
+        self.stok_tersedia = stok_tersedia
 
 
 async def _resolve_customer(
@@ -55,9 +65,14 @@ async def siapkan_record_sale(
     item_mentah = ekstrak_item_penjualan(pesan)
     if not item_mentah:
         return (
-            "Format penjualan kurang jelas. Contoh: "
-            "\"tadi jual 3 aqua sama 2 rokok\" atau "
-            "\"jual 2 indomie bon Bu Sari\"",
+            t(
+                'Format penjualan kurang jelas. Contoh: '
+                '"tadi jual 3 aqua sama 2 rokok" atau '
+                '"jual 2 indomie bon Bu Sari"',
+                'Sale format unclear. Example: '
+                '"sold 3 aqua and 2 cigarettes" or '
+                '"sell 2 indomie on credit for Bu Sari"',
+            ),
             ["minta_detail_penjualan"],
         )
 
@@ -67,7 +82,10 @@ async def siapkan_record_sale(
     for qty, nama_produk in item_mentah:
         if qty <= 0:
             return (
-                f"Jumlah tidak valid untuk \"{nama_produk}\". Harus lebih dari 0.",
+                t(
+                    f'Jumlah tidak valid untuk "{nama_produk}". Harus lebih dari 0.',
+                    f'Invalid quantity for "{nama_produk}". Must be greater than 0.',
+                ),
                 ["validasi_qty_gagal"],
             )
 
@@ -79,18 +97,28 @@ async def siapkan_record_sale(
                 f"  {i + 1}. {p['name']}" for i, p in enumerate(opsi)
             )
             return (
-                f"Produk \"{nama_produk}\" ambigu. Maksudnya yang mana?\n{baris}",
+                t(
+                    f'Produk "{nama_produk}" ambigu. Maksudnya yang mana?\n{baris}',
+                    f'Product "{nama_produk}" is ambiguous. Which one?\n{baris}',
+                ),
                 [*aksi, "disambiguasi_produk"],
             )
         if not produk:
             return (
-                f"Produk \"{nama_produk}\" tidak ditemukan.",
+                t(
+                    f'Produk "{nama_produk}" tidak ditemukan.',
+                    f'Product "{nama_produk}" not found.',
+                ),
                 [*aksi, "produk_tidak_ditemukan"],
             )
         if produk["stock_current"] < qty:
             return (
-                f"Stok **{produk['name']}** tidak cukup. "
-                f"Tersedia {produk['stock_current']} {produk['unit']}, diminta {qty}.",
+                t(
+                    f"Stok **{produk['name']}** tidak cukup. "
+                    f"Tersedia {produk['stock_current']} {produk['unit']}, diminta {qty}.",
+                    f"**{produk['name']}** stock insufficient. "
+                    f"Available {produk['stock_current']} {produk['unit']}, requested {qty}.",
+                ),
                 [*aksi, "stok_tidak_cukup"],
             )
 
@@ -107,7 +135,11 @@ async def siapkan_record_sale(
 
     total = sum(i["subtotal"] for i in item_siap)
     teks = pesan.lower()
-    metode = "hutang" if "hutang" in teks or "bon" in teks else "tunai"
+    metode = (
+        "hutang"
+        if any(k in teks for k in ("hutang", "bon", "credit", "on credit"))
+        else "tunai"
+    )
 
     customer_id: Optional[str] = None
     customer_name: Optional[str] = None
@@ -115,8 +147,12 @@ async def siapkan_record_sale(
     if metode == "hutang":
         if not nama_customer_hutang:
             return (
-                "Penjualan bon/hutang perlu nama customer. "
-                "Contoh: \"jual 2 indomie bon Bu Sari\"",
+                t(
+                    'Penjualan bon/hutang perlu nama customer. '
+                    'Contoh: "jual 2 indomie bon Bu Sari"',
+                    'Credit sales need a customer name. '
+                    'Example: "sell 2 indomie on credit for Bu Sari"',
+                ),
                 ["minta_nama_customer_hutang"],
             )
         customer, opsi_cust = await _resolve_customer(db, nama_customer_hutang)
@@ -126,12 +162,18 @@ async def siapkan_record_sale(
                 f"  {i + 1}. {c['name']}" for i, c in enumerate(opsi_cust)
             )
             return (
-                f"Customer \"{nama_customer_hutang}\" ambigu:\n{baris}",
+                t(
+                    f'Customer "{nama_customer_hutang}" ambigu:\n{baris}',
+                    f'Customer "{nama_customer_hutang}" is ambiguous:\n{baris}',
+                ),
                 [*aksi, "disambiguasi_customer"],
             )
         if not customer:
             return (
-                f"Customer \"{nama_customer_hutang}\" tidak ditemukan.",
+                t(
+                    f'Customer "{nama_customer_hutang}" tidak ditemukan.',
+                    f'Customer "{nama_customer_hutang}" not found.',
+                ),
                 [*aksi, "customer_tidak_ditemukan"],
             )
         customer_id = str(customer["_id"])
@@ -180,16 +222,16 @@ async def eksekusi_record_sale(
 
     async def _jalankan(sesi: AsyncClientSession) -> list[str]:
         aksi_dalam: list[str] = []
-        _, aksi_ins = await mcp_insert_one(
-            db, "transactions", dokumen_tx, session=sesi
-        )
-        aksi_dalam.extend(aksi_ins)
 
+        # Kurangi stok dulu dengan filter atomik — cegah race & stok negatif
         for item in draft["items"]:
-            _, aksi_upd = await mcp_update_one(
+            jumlah_diubah, aksi_upd = await mcp_update_one(
                 db,
                 "products",
-                {"_id": ObjectId(item["product_id"])},
+                {
+                    "_id": ObjectId(item["product_id"]),
+                    "stock_current": {"$gte": item["qty"]},
+                },
                 {
                     "$inc": {"stock_current": -item["qty"]},
                     "$set": {"updated_at": sekarang},
@@ -197,6 +239,28 @@ async def eksekusi_record_sale(
                 session=sesi,
             )
             aksi_dalam.extend(aksi_upd)
+            if jumlah_diubah == 0:
+                from app.services.atlas_tools import mcp_find
+
+                dokumen_stok, _ = await mcp_find(
+                    db,
+                    "products",
+                    {"_id": ObjectId(item["product_id"])},
+                    limit=1,
+                )
+                stok_sekarang = (
+                    dokumen_stok[0].get("stock_current") if dokumen_stok else None
+                )
+                raise StokKonfirmasiGagal(
+                    item["product_name"],
+                    item["qty"],
+                    stok_sekarang,
+                )
+
+        _, aksi_ins = await mcp_insert_one(
+            db, "transactions", dokumen_tx, session=sesi
+        )
+        aksi_dalam.extend(aksi_ins)
 
         if draft["payment_method"] == "hutang" and draft.get("customer_id"):
             ringkasan_item = ", ".join(
@@ -225,9 +289,31 @@ async def eksekusi_record_sale(
 
     try:
         aksi_transaksi = await jalankan_dalam_transaksi(db, _jalankan)
+    except StokKonfirmasiGagal as gagal:
+        await hapus_pending(db, session_id)
+        if gagal.stok_tersedia is not None:
+            pesan = t(
+                f"Stok **{gagal.nama_produk}** tidak cukup lagi saat konfirmasi. "
+                f"Tersedia {gagal.stok_tersedia} pcs, diminta {gagal.qty_diminta}. "
+                "Silakan catat penjualan ulang.",
+                f"**{gagal.nama_produk}** stock changed before confirmation. "
+                f"Available {gagal.stok_tersedia} pcs, requested {gagal.qty_diminta}. "
+                "Please record the sale again.",
+            )
+        else:
+            pesan = t(
+                f"Stok **{gagal.nama_produk}** tidak cukup lagi saat konfirmasi. "
+                "Silakan catat penjualan ulang.",
+                f"**{gagal.nama_produk}** stock insufficient at confirmation. "
+                "Please record the sale again.",
+            )
+        return pesan, ["stok_konfirmasi_gagal"]
     except Exception:
         return (
-            "Gagal mencatat penjualan — perubahan dibatalkan. Coba lagi sebentar.",
+            t(
+                "Gagal mencatat penjualan — perubahan dibatalkan. Coba lagi sebentar.",
+                "Failed to record sale — changes rolled back. Please try again.",
+            ),
             ["error_transaksi_atomik"],
         )
 
@@ -238,12 +324,21 @@ async def eksekusi_record_sale(
     )
     teks_hutang = ""
     if draft["payment_method"] == "hutang" and draft.get("customer_name"):
-        teks_hutang = f"\nHutang **{draft['customer_name']}** bertambah **{format_rupiah(draft['total'])}**."
+        teks_hutang = t(
+            f"\nHutang **{draft['customer_name']}** bertambah **{format_rupiah(draft['total'])}**.",
+            f"\n**{draft['customer_name']}** debt increased by **{format_rupiah(draft['total'])}**.",
+        )
 
+    metode_label = label_metode_bayar(draft["payment_method"])
     return (
-        f"Penjualan **berhasil dicatat**.\n{baris}\n"
-        f"Total: **{format_rupiah(draft['total'])}** ({draft['payment_method']})."
-        f"{teks_hutang}",
+        t(
+            f"Penjualan **berhasil dicatat**.\n{baris}\n"
+            f"Total: **{format_rupiah(draft['total'])}** ({metode_label})."
+            f"{teks_hutang}",
+            f"Sale **recorded successfully**.\n{baris}\n"
+            f"Total: **{format_rupiah(draft['total'])}** ({metode_label})."
+            f"{teks_hutang}",
+        ),
         [*aksi_utama, *aksi_transaksi, "transaksi_atomik"],
     )
 
@@ -257,12 +352,18 @@ async def siapkan_record_payment(
     nama, jumlah = ekstrak_pembayaran_hutang(pesan)
     if not nama:
         return (
-            "Hutang siapa yang dibayar? Contoh: \"Bu Sari bayar hutang 50 ribu\"",
+            t(
+                'Hutang siapa yang dibayar? Contoh: "Bu Sari bayar hutang 50 ribu"',
+                'Whose debt is being paid? Example: "Bu Sari pays debt 50000"',
+            ),
             ["minta_nama_customer"],
         )
     if not jumlah or jumlah <= 0:
         return (
-            "Jumlah pembayaran tidak valid. Contoh: \"bayar hutang 50 ribu\"",
+            t(
+                'Jumlah pembayaran tidak valid. Contoh: "bayar hutang 50 ribu"',
+                'Invalid payment amount. Example: "pay debt 50000"',
+            ),
             ["validasi_jumlah_gagal"],
         )
 
@@ -271,18 +372,37 @@ async def siapkan_record_payment(
 
     if opsi:
         baris = "\n".join(f"  {i + 1}. {c['name']}" for i, c in enumerate(opsi))
-        return f"Ada beberapa pelanggan yang cocok:\n{baris}", [*aksi, "disambiguasi_customer"]
+        return (
+            t(
+                f"Ada beberapa pelanggan yang cocok:\n{baris}",
+                f"Several customers match:\n{baris}",
+            ),
+            [*aksi, "disambiguasi_customer"],
+        )
     if not customer:
-        return f"Customer \"{nama}\" tidak ditemukan.", [*aksi, "customer_tidak_ditemukan"]
+        return (
+            t(f'Customer "{nama}" tidak ditemukan.', f'Customer "{nama}" not found.'),
+            [*aksi, "customer_tidak_ditemukan"],
+        )
 
     hutang = customer.get("debt_total", 0)
     if hutang <= 0:
-        return f"{customer['name']} tidak punya hutang aktif.", aksi
+        return (
+            t(
+                f"{customer['name']} tidak punya hutang aktif.",
+                f"{customer['name']} has no outstanding debt.",
+            ),
+            aksi,
+        )
 
     if jumlah > hutang:
         return (
-            f"Pembayaran **{format_rupiah(jumlah)}** melebihi hutang "
-            f"**{format_rupiah(hutang)}**. Tolong sesuaikan jumlahnya.",
+            t(
+                f"Pembayaran **{format_rupiah(jumlah)}** melebihi hutang "
+                f"**{format_rupiah(hutang)}**. Tolong sesuaikan jumlahnya.",
+                f"Payment **{format_rupiah(jumlah)}** exceeds debt "
+                f"**{format_rupiah(hutang)}**. Please adjust the amount.",
+            ),
             [*aksi, "jumlah_melebihi_hutang"],
         )
 
@@ -312,7 +432,7 @@ async def eksekusi_record_payment(
     cust = await db.customers.find_one({"_id": cid})
     if not cust:
         await hapus_pending(db, session_id)
-        return "Customer tidak ditemukan.", ["error"]
+        return t("Customer tidak ditemukan.", "Customer not found."), ["error"]
 
     sisa_bayar = jumlah
     riwayat_baru = []
@@ -365,14 +485,22 @@ async def eksekusi_record_payment(
         aksi_transaksi = await jalankan_dalam_transaksi(db, _jalankan)
     except Exception:
         return (
-            "Gagal mencatat pembayaran — perubahan dibatalkan. Coba lagi sebentar.",
+            t(
+                "Gagal mencatat pembayaran — perubahan dibatalkan. Coba lagi sebentar.",
+                "Failed to record payment — changes rolled back. Please try again.",
+            ),
             ["error_transaksi_atomik"],
         )
 
     await hapus_pending(db, session_id)
     return (
-        f"Pembayaran hutang **{draft['customer_name']}** "
-        f"**{format_rupiah(jumlah)}** berhasil dicatat.\n"
-        f"Sisa hutang: **{format_rupiah(draft['debt_after'])}**.",
+        t(
+            f"Pembayaran hutang **{draft['customer_name']}** "
+            f"**{format_rupiah(jumlah)}** berhasil dicatat.\n"
+            f"Sisa hutang: **{format_rupiah(draft['debt_after'])}**.",
+            f"Debt payment for **{draft['customer_name']}** "
+            f"**{format_rupiah(jumlah)}** recorded successfully.\n"
+            f"Remaining debt: **{format_rupiah(draft['debt_after'])}**.",
+        ),
         [*aksi_utama, *aksi_transaksi, "transaksi_atomik"],
     )

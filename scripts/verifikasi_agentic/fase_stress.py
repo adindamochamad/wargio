@@ -35,13 +35,33 @@ async def _post_chat(
     )
 
 
+def _ambil_balasan(respons: httpx.Response) -> str:
+    """API Wargio memakai field `balasan`, bukan `response`."""
+    if respons.status_code != 200:
+        return ""
+    data = respons.json()
+    return str(data.get("balasan") or data.get("response") or "")
+
+
 async def _stress_qty_negatif(klien: httpx.AsyncClient) -> HasilGate:
     sid = f"stress-negatif-{uuid.uuid4().hex[:8]}"
     r = await _post_chat(klien, "jual minus 2 indomie", sid)
     if r.status_code != 200:
         return HasilGate("qty_negatif", StatusGate.GAGAL, f"HTTP {r.status_code}", blocker=True)
-    teks = r.json().get("response", "").lower()
-    tolak = any(k in teks for k in ("tidak valid", "invalid", "negatif", "minimum", "tolak", "gagal"))
+    teks = _ambil_balasan(r).lower()
+    tolak = any(
+        k in teks
+        for k in (
+            "tidak valid",
+            "invalid",
+            "negatif",
+            "minimum",
+            "tolak",
+            "gagal",
+            "kurang jelas",
+            "jumlah tidak",
+        )
+    )
     return HasilGate(
         "qty_negatif",
         StatusGate.LOLOS if tolak else StatusGate.GAGAL,
@@ -56,7 +76,7 @@ async def _stress_stok_kurang(klien: httpx.AsyncClient) -> HasilGate:
     r = await _post_chat(klien, "jual 999999 indomie goreng", sid)
     if r.status_code != 200:
         return HasilGate("stok_kurang", StatusGate.GAGAL, f"HTTP {r.status_code}", blocker=True)
-    teks = r.json().get("response", "").lower()
+    teks = _ambil_balasan(r).lower()
     tolak = any(k in teks for k in ("stok", "tidak cukup", "kurang", "habis", "maksimum"))
     return HasilGate(
         "stok_kurang",
@@ -72,7 +92,7 @@ async def _stress_konfirmasi_batal(klien: httpx.AsyncClient) -> HasilGate:
     r1 = await _post_chat(klien, "jual 1 indomie goreng", sid)
     if r1.status_code != 200:
         return HasilGate("konfirmasi_batal", StatusGate.GAGAL, "Setup penjualan gagal", blocker=True)
-    teks1 = r1.json().get("response", "")
+    teks1 = _ambil_balasan(r1)
     if "konfirmasi" not in teks1.lower() and "ya" not in teks1.lower():
         return HasilGate(
             "konfirmasi_batal",
@@ -82,7 +102,7 @@ async def _stress_konfirmasi_batal(klien: httpx.AsyncClient) -> HasilGate:
             bukti=teks1[:200],
         )
     r2 = await _post_chat(klien, "batal", sid)
-    teks2 = r2.json().get("response", "").lower()
+    teks2 = _ambil_balasan(r2).lower()
     ok = any(k in teks2 for k in ("batal", "dibatalkan", "tidak jadi", "oke"))
     return HasilGate(
         "konfirmasi_batal",
@@ -98,7 +118,7 @@ async def _stress_disambiguasi_customer(klien: httpx.AsyncClient) -> HasilGate:
     r = await _post_chat(klien, "hutang sari berapa?", sid)
     if r.status_code != 200:
         return HasilGate("disambiguasi_customer", StatusGate.GAGAL, f"HTTP {r.status_code}", blocker=True)
-    teks = r.json().get("response", "")
+    teks = _ambil_balasan(r)
     # Bisa resolve tunggal ATAU tampilkan opsi — keduanya valid
     intent = r.json().get("intent", "")
     if intent != "check_debt":
@@ -154,7 +174,7 @@ async def _stress_isolasi_sesi(klien: httpx.AsyncClient) -> HasilGate:
     sid_b = f"stress-b-{uuid.uuid4().hex[:8]}"
     await _post_chat(klien, "jual 1 indomie goreng", sid_a)
     r_b = await _post_chat(klien, "ya", sid_b)
-    teks = r_b.json().get("response", "").lower()
+    teks = _ambil_balasan(r_b).lower()
     # Sesi B tidak boleh mengeksekusi pending dari sesi A
     eksekusi_silang = "berhasil" in teks and "catat" in teks
     return HasilGate(
@@ -178,6 +198,116 @@ async def _stress_fuzzy_capslock(klien: httpx.AsyncClient) -> HasilGate:
         "CAPSLOCK tetap check_stock" if ok else f"CAPSLOCK gagal intent={intent}",
         blocker=not ok,
     )
+
+
+async def _stress_chat_timeout_ui(klien: httpx.AsyncClient) -> HasilGate:
+    """Pastikan timeout UI 90s ada di kode + chat selesai dalam batas waktu."""
+    import time
+
+    api_ts = ROOT / "frontend" / "src" / "lib" / "api.ts"
+    if not api_ts.exists():
+        return HasilGate(
+            "chat_timeout_ui",
+            StatusGate.GAGAL,
+            "frontend/src/lib/api.ts tidak ada",
+            blocker=True,
+        )
+    teks_api = api_ts.read_text(encoding="utf-8")
+    timeout_kode = "90_000" in teks_api or "90000" in teks_api
+    if not timeout_kode:
+        return HasilGate(
+            "chat_timeout_ui",
+            StatusGate.GAGAL,
+            "BATAS_WAKTU_MS 90s tidak ditemukan di api.ts",
+            blocker=True,
+        )
+
+    sid = f"stress-timeout-{uuid.uuid4().hex[:8]}"
+    mulai = time.monotonic()
+    r = await _post_chat(klien, "stok indomie goreng berapa?", sid)
+    durasi = time.monotonic() - mulai
+    if r.status_code != 200:
+        return HasilGate(
+            "chat_timeout_ui",
+            StatusGate.GAGAL,
+            f"Chat HTTP {r.status_code} — timeout UI tidak bisa diverifikasi",
+            blocker=True,
+        )
+    ok = durasi < 90.0
+    return HasilGate(
+        "chat_timeout_ui",
+        StatusGate.LOLOS if ok else StatusGate.GAGAL,
+        f"Timeout 90s di kode + chat selesai {durasi:.1f}s"
+        if ok
+        else f"Chat >90s ({durasi:.1f}s) — UI terasa hang",
+        blocker=not ok,
+        bukti=f"durasi={durasi:.2f}s",
+    )
+
+
+async def _stress_production_ui() -> HasilGate:
+    """Smoke production: health + dashboard + UI root + 1 intent."""
+    url = URL_PROD or os.getenv("WARGIO_PUBLIC_URL", "").strip().rstrip("/")
+    if not url:
+        return HasilGate(
+            "production_ui",
+            StatusGate.PERINGATAN,
+            "WARGIO_PRODUCTION_URL/WARGIO_PUBLIC_URL kosong — production UI belum diverifikasi",
+            blocker=False,
+        )
+    try:
+        async with httpx.AsyncClient(base_url=url, timeout=90.0) as klien:
+            h = await klien.get("/api/health")
+            if h.status_code != 200 or h.json().get("atlas") is not True:
+                return HasilGate(
+                    "production_ui",
+                    StatusGate.GAGAL,
+                    f"Production health gagal ({h.status_code})",
+                    blocker=True,
+                )
+            d = await klien.get("/api/dashboard")
+            if d.status_code != 200:
+                return HasilGate(
+                    "production_ui",
+                    StatusGate.GAGAL,
+                    f"/api/dashboard production {d.status_code}",
+                    blocker=True,
+                )
+            root = await klien.get("/")
+            if root.status_code != 200:
+                return HasilGate(
+                    "production_ui",
+                    StatusGate.GAGAL,
+                    f"Frontend / HTTP {root.status_code}",
+                    blocker=True,
+                )
+            sid = f"stress-prod-ui-{uuid.uuid4().hex[:8]}"
+            c = await klien.post(
+                "/api/chat",
+                json={"pesan": "stok indomie goreng berapa?"},
+                headers={"X-Session-Id": sid},
+            )
+            if c.status_code != 200 or c.json().get("intent") != "check_stock":
+                return HasilGate(
+                    "production_ui",
+                    StatusGate.GAGAL,
+                    "Chat production check_stock gagal",
+                    blocker=True,
+                    bukti=(c.text or "")[:200],
+                )
+            return HasilGate(
+                "production_ui",
+                StatusGate.LOLOS,
+                f"Production UI + API OK ({url})",
+                bukti="health + dashboard + / + check_stock",
+            )
+    except httpx.HTTPError as e:
+        return HasilGate(
+            "production_ui",
+            StatusGate.GAGAL,
+            f"Tidak bisa konek production UI: {e}",
+            blocker=True,
+        )
 
 
 async def _stress_cors(klien: httpx.AsyncClient) -> HasilGate:
@@ -236,6 +366,49 @@ async def _stress_health_production() -> HasilGate:
         )
 
 
+def _stress_smoke_production_full() -> HasilGate:
+    """Smoke penuh: health + atlas + dashboard + 4 intent + UI root."""
+    url = URL_PROD or os.getenv("WARGIO_PUBLIC_URL", "").strip().rstrip("/")
+    if not url:
+        return HasilGate(
+            "smoke_production_full",
+            StatusGate.PERINGATAN,
+            "WARGIO_PRODUCTION_URL kosong — smoke penuh dilewati",
+            blocker=False,
+        )
+    skrip = ROOT / "scripts" / "smoke_production.sh"
+    if not skrip.exists():
+        return HasilGate(
+            "smoke_production_full",
+            StatusGate.GAGAL,
+            "scripts/smoke_production.sh tidak ada",
+            blocker=True,
+        )
+    hasil = subprocess.run(
+        ["bash", str(skrip)],
+        cwd=ROOT,
+        env={**os.environ, "WARGIO_PRODUCTION_URL": url},
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    gabungan = (hasil.stdout or "") + (hasil.stderr or "")
+    if hasil.returncode == 0:
+        return HasilGate(
+            "smoke_production_full",
+            StatusGate.LOLOS,
+            f"Smoke production lolos: {url}",
+            bukti=gabungan[-300:],
+        )
+    return HasilGate(
+        "smoke_production_full",
+        StatusGate.GAGAL,
+        "Smoke production gagal — cek health/dashboard/4 intent/UI",
+        blocker=True,
+        bukti=gabungan[-500:],
+    )
+
+
 def _stress_k6_ringan() -> HasilGate:
     skrip = ROOT / "deploy" / "k6" / "smoke_10_users.js"
     if not skrip.exists():
@@ -275,6 +448,107 @@ def _stress_k6_ringan() -> HasilGate:
     )
 
 
+async def _stress_edge_case_hari6(klien: httpx.AsyncClient) -> HasilGate:
+    """Bundel edge case Hari 6: kosong, qty negatif, stok tanpa produk, capslock."""
+    gagal: list[str] = []
+
+    kosong = await klien.post("/api/chat", json={"pesan": ""})
+    if kosong.status_code != 422:
+        gagal.append(f"pesan kosong HTTP {kosong.status_code}")
+
+    sid = f"stress-h6-{uuid.uuid4().hex[:8]}"
+    neg = await _post_chat(klien, "jual minus 1 indomie", sid)
+    if neg.status_code == 200:
+        teks = _ambil_balasan(neg).lower()
+        if not any(k in teks for k in ("tidak valid", "negatif", "jumlah tidak", "kurang jelas")):
+            gagal.append("qty negatif tidak ditolak")
+    else:
+        gagal.append(f"qty negatif HTTP {neg.status_code}")
+
+    spesifik = await _post_chat(klien, "stok berapa?", f"{sid}-spesifik")
+    if spesifik.status_code == 200:
+        if "produk mana" not in _ambil_balasan(spesifik).lower():
+            gagal.append("stok berapa? tidak minta produk")
+    else:
+        gagal.append(f"stok berapa HTTP {spesifik.status_code}")
+
+    caps = await _post_chat(klien, "STOK INDOMIE GORENG BERAPA?", f"{sid}-caps")
+    if caps.status_code == 200:
+        if caps.json().get("intent") != "check_stock":
+            gagal.append("CAPSLOCK bukan check_stock")
+    else:
+        gagal.append(f"CAPSLOCK HTTP {caps.status_code}")
+
+    if gagal:
+        return HasilGate(
+            "edge_case_hari6",
+            StatusGate.GAGAL,
+            f"Edge case gagal: {', '.join(gagal)}",
+            blocker=True,
+            bukti="; ".join(gagal),
+        )
+    return HasilGate(
+        "edge_case_hari6",
+        StatusGate.LOLOS,
+        "Edge case Hari 6: kosong, qty negatif, stok tanpa produk, CAPSLOCK",
+    )
+
+
+async def _stress_mcp_fallback_pesan(klien: httpx.AsyncClient) -> HasilGate:
+    """Fallback error Atlas — unit test executor + chat sukses tanpa error EN."""
+    import subprocess
+
+    py = ROOT / "backend" / ".venv" / "bin" / "python"
+    hasil_unit = subprocess.run(
+        [
+            str(py),
+            "-m",
+            "pytest",
+            "tests/test_executor.py::test_retry_gagal_total",
+            "-q",
+            "--tb=line",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if hasil_unit.returncode != 0:
+        return HasilGate(
+            "mcp_fallback_pesan",
+            StatusGate.GAGAL,
+            "Unit test fallback Atlas gagal",
+            blocker=True,
+            bukti=(hasil_unit.stdout or "")[-300:],
+        )
+
+    sid = f"stress-mcp-{uuid.uuid4().hex[:8]}"
+    r = await _post_chat(klien, "stok indomie goreng berapa?", sid)
+    if r.status_code != 200:
+        return HasilGate(
+            "mcp_fallback_pesan",
+            StatusGate.GAGAL,
+            f"Chat HTTP {r.status_code}",
+            blocker=True,
+        )
+    teks = _ambil_balasan(r).lower()
+    english_kasar = ("internal server error", "traceback", "exception")
+    if any(k in teks for k in english_kasar):
+        return HasilGate(
+            "mcp_fallback_pesan",
+            StatusGate.GAGAL,
+            "Balasan mengandung error Inggris mentah",
+            blocker=True,
+            bukti=teks[:200],
+        )
+    return HasilGate(
+        "mcp_fallback_pesan",
+        StatusGate.LOLOS,
+        "Fallback Atlas ID (unit) + chat sukses tanpa error EN",
+        bukti="gangguan teknis + chat OK",
+    )
+
+
 _STRESS_HANDLERS: dict[str, Any] = {
     "qty_negatif": _stress_qty_negatif,
     "stok_kurang": _stress_stok_kurang,
@@ -285,6 +559,9 @@ _STRESS_HANDLERS: dict[str, Any] = {
     "isolasi_sesi": _stress_isolasi_sesi,
     "fuzzy_capslock": _stress_fuzzy_capslock,
     "cors_preflight": _stress_cors,
+    "chat_timeout_ui": _stress_chat_timeout_ui,
+    "edge_case_hari6": _stress_edge_case_hari6,
+    "mcp_fallback_pesan": _stress_mcp_fallback_pesan,
 }
 
 
@@ -344,8 +621,12 @@ async def jalankan_fase_stress(entri: dict[str, Any]) -> LaporanFase:
             for nama in daftar:
                 if nama == "load_k6_ringan":
                     gates.append(_stress_k6_ringan())
+                elif nama == "smoke_production_full":
+                    gates.append(_stress_smoke_production_full())
                 elif nama == "health_production":
                     gates.append(await _stress_health_production())
+                elif nama == "production_ui":
+                    gates.append(await _stress_production_ui())
                 elif nama in _STRESS_HANDLERS:
                     gates.append(await _jalankan_stress_http(nama, klien_http))
                 else:
@@ -362,6 +643,10 @@ async def jalankan_fase_stress(entri: dict[str, Any]) -> LaporanFase:
             for nama in daftar:
                 if nama == "health_production":
                     gates.append(await _stress_health_production())
+                elif nama == "smoke_production_full":
+                    gates.append(_stress_smoke_production_full())
+                elif nama == "production_ui":
+                    gates.append(await _stress_production_ui())
                 elif nama == "load_k6_ringan":
                     gates.append(_stress_k6_ringan())
                 else:

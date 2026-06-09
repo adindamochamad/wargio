@@ -7,7 +7,7 @@ Panduan ini menggantikan Cloud Run + Vercel untuk submission. Yang wajib hackath
 ```text
 Internet :443 (HTTPS)
     └── Nginx (SSL Let's Encrypt)
-            ├── /          → Next.js :3000
+            ├── /          → Next.js :3010 (host) → :3000 (container)
             └── /api/*     → FastAPI :8000
 MongoDB Atlas (cloud, tetap di luar VPS)
 ```
@@ -92,16 +92,16 @@ bash scripts/deploy_ssh.sh user@ip-vps https://wargio.contohdomain.com
 
 ## Checklist Hari 5 (VPS)
 
-- [ ] `deploy/.env.production` terisi (tidak di git)
-- [ ] Atlas allowlist IP VPS
-- [ ] `docker compose up` — api + web healthy
-- [ ] Nginx HTTPS aktif
-- [ ] `curl https://DOMAIN/api/health` → `"atlas":true`
-- [ ] `curl https://DOMAIN/api/dashboard` → JSON
-- [ ] UI: 4 quick action Tier 1 tanpa error
-- [ ] `scripts/verifikasi_hari5.py` lolos
-- [ ] README: Live URL di bagian Demo
-- [ ] Devpost: URL production
+- [x] `deploy/.env.production` terisi (tidak di git)
+- [x] Atlas allowlist IP VPS (`45.76.156.99/32`)
+- [x] `docker compose up` — api + web healthy (web host `:3010`)
+- [x] Nginx HTTPS aktif
+- [x] `curl https://DOMAIN/api/health` → `"atlas":true`
+- [x] `curl https://DOMAIN/api/dashboard` → JSON
+- [x] UI: 4 quick action Tier 1 tanpa error
+- [x] `scripts/verifikasi_hari5.py` lolos
+- [x] README: Live URL di bagian Demo
+- [x] Devpost: Live URL siap — `docs/devpost-submission.md` (paste ke form Devpost)
 
 ## Troubleshooting
 
@@ -112,6 +112,7 @@ bash scripts/deploy_ssh.sh user@ip-vps https://wargio.contohdomain.com
 | Chat lambat | `MCP_LIVE_ENABLED=false`, restart api |
 | Atlas gagal | Cek IP VPS di Network Access |
 | 502 Bad Gateway | `docker compose ps`; cek log `docker compose logs api` |
+| `/` HTTP 400 "Invalid Host header" | Port host 3000 bentrok — cek `ss -tlnp \| grep 3000`; gunakan map `3010:3000` di compose |
 
 ## Tanpa Docker (manual)
 

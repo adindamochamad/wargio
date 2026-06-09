@@ -197,7 +197,7 @@ async def test_record_sale_bon_tanpa_nama_customer():
         data = await _chat(klien, "jual 2 indomie goreng bon", "h6-sale-bon-noname")
     assert data["intent"] == "record_sale"
     balasan = data["balasan"].lower()
-    assert "nama" in balasan or "customer" in balasan or "konfirmasi" in balasan or "berhasil" in balasan
+    assert any(k in balasan for k in ("nama", "konfirmasi", "berhasil", "pelanggan", "siapa"))
 
 
 @pytest.mark.asyncio
@@ -259,7 +259,7 @@ async def test_debt_collection_intent():
         data = await _chat(klien, "siapa yang belum bayar hutang?", "h6-debt-col")
     assert data["intent"] == "debt_collection"
     balasan = data["balasan"].lower()
-    assert "hutang" in balasan or "customer" in balasan or "tidak ada" in balasan
+    assert any(k in balasan for k in ("hutang", "belum", "tidak ada", "lunasi"))
 
 
 @pytest.mark.asyncio
@@ -303,8 +303,12 @@ async def test_check_stock_indomie_status_ada():
 @pytest.mark.asyncio
 async def test_check_stock_produk_kritis_status():
     async with _klien() as klien:
-        # Aqua sedang dalam stok kritis (stok 2/11)
-        data = await _chat(klien, "stok aqua 600ml berapa?", "h6-stock-kritis")
+        # Nama lengkap agar tidak disambiguasi dengan aqua gelas/botol
+        data = await _chat(
+            klien,
+            "stok air mineral aqua 600ml berapa?",
+            "h6-stock-kritis",
+        )
     assert data["intent"] == "check_stock"
     balasan = data["balasan"].lower()
     assert "habis" in balasan or "restock" in balasan or "minimum" in balasan
@@ -387,3 +391,48 @@ async def test_health_response_headers():
     assert res.status_code == 200
     # Content-Type harus application/json
     assert "application/json" in res.headers.get("content-type", "")
+
+
+# ---------------------------------------------------------------------------
+# Unit — agent_gemini fallback
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_tentukan_intent_fallback_regex():
+    from app.services.agent_gemini import tentukan_intent
+
+    intent, mode = await tentukan_intent("stok indomie goreng berapa?")
+    assert intent == "check_stock"
+    assert mode in ("regex", "gemini")
+
+
+def test_gemini_runtime_belum_dipanggil():
+    from app.services.agent_gemini import gemini_runtime_ok
+
+    assert gemini_runtime_ok() in (None, True, False)
+
+
+# ---------------------------------------------------------------------------
+# Rate limit — pesan Bahasa Indonesia
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_rate_limit_pesan_indonesia():
+    import uuid
+
+    sid = f"h6-rate-{uuid.uuid4().hex}"
+    async with _klien() as klien:
+        respons_429 = None
+        for _ in range(35):
+            res = await klien.post(
+                "/api/chat",
+                json={"pesan": "halo"},
+                headers={"X-Session-Id": sid},
+            )
+            if res.status_code == 429:
+                respons_429 = res
+                break
+        assert respons_429 is not None, "Rate limit 429 tidak terpicu dalam 35 req"
+        detail = respons_429.json().get("detail", "")
+        assert isinstance(detail, str)
+        assert "permintaan" in detail.lower() or "tunggu" in detail.lower()

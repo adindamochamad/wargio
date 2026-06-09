@@ -73,23 +73,23 @@ async def main() -> None:
             print(f"  GAGAL: field tidak dikenal: {list(agg[0].keys())}")
             gagal += 1
 
-        print("\n[4] npm verifikasi:mcp (standalone)...")
+        print("\n[4] MCP standalone (verifikasi_mcp.mjs)...")
         import subprocess
 
+        skrip_mcp = ROOT / "scripts" / "verifikasi_mcp.mjs"
+        # stdout/stderr ke DEVNULL — pipe ke parent memicu EPIPE pada MCP stdio transport
         hasil = subprocess.run(
-            ["npm", "run", "verifikasi:mcp"],
+            ["node", str(skrip_mcp)],
             cwd=ROOT,
-            capture_output=True,
-            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=180,
         )
         if hasil.returncode != 0:
-            print(f"  GAGAL: {hasil.stderr[:200]}")
+            print(f"  GAGAL: verifikasi_mcp.mjs exit {hasil.returncode}")
             gagal += 1
-        elif "OK: MCP find stok rendah berhasil" in hasil.stdout:
-            print("  OK npm verifikasi:mcp")
         else:
-            print("  GAGAL: output tidak sesuai")
-            gagal += 1
+            print("  OK MCP standalone find stok rendah")
 
     finally:
         await tutup_pool_mcp()

@@ -31,6 +31,7 @@ from app.services.write_handlers import (
     siapkan_record_payment,
     siapkan_record_sale,
 )
+from app.util.lokalisasi import konteks_bahasa, t
 
 MAX_COBA_ULANG = 1
 
@@ -65,7 +66,10 @@ async def _proses_konfirmasi_tunda(
     if adalah_batal(pesan):
         await hapus_pending(db, session_id)
         return {
-            "balasan": "Oke, dibatalkan. Tidak ada perubahan di database.",
+            "balasan": t(
+                "Oke, dibatalkan. Tidak ada perubahan di database.",
+                "Cancelled. No changes were made to the database.",
+            ),
             "intent": pending.get("tipe"),
             "actions_taken": ["konfirmasi_dibatalkan"],
             "classification_mode": "regex",
@@ -79,9 +83,11 @@ async def _proses_konfirmasi_tunda(
 
     if not adalah_konfirmasi(pesan):
         return {
-            "balasan": (
+            "balasan": t(
                 "Masih ada transaksi yang menunggu konfirmasi. "
-                "Balas **ya** untuk melanjutkan atau **batal** untuk membatalkan."
+                "Balas **ya** untuk melanjutkan atau **batal** untuk membatalkan.",
+                "A transaction is still awaiting confirmation. "
+                "Reply **yes** to continue or **cancel** to abort.",
             ),
             "intent": pending.get("tipe"),
             "actions_taken": ["menunggu_konfirmasi"],
@@ -96,7 +102,10 @@ async def _proses_konfirmasi_tunda(
     else:
         await hapus_pending(db, session_id)
         return {
-            "balasan": "Aksi tidak dikenali, dibatalkan.",
+            "balasan": t(
+                "Aksi tidak dikenali, dibatalkan.",
+                "Unknown action — cancelled.",
+            ),
             "intent": None,
             "actions_taken": ["error"],
             "classification_mode": "regex",
@@ -133,8 +142,12 @@ async def _jalankan_intent(
     if intent == "sales_forecast":
         return await handle_sales_forecast(db)
     return (
-        "Maaf, saya belum paham maksudnya. Coba tanya tentang stok, hutang, "
-        "penjualan, restock, atau laporan.",
+        t(
+            "Maaf, saya belum paham maksudnya. Coba tanya tentang stok, hutang, "
+            "penjualan, restock, atau laporan.",
+            "Sorry, I didn't understand. Try asking about stock, debt, "
+            "sales, restock, or reports.",
+        ),
         [],
     )
 
@@ -143,26 +156,34 @@ async def proses_pesan(
     db: AsyncDatabase,
     pesan: str,
     session_id: str,
+    *,
+    kode_bahasa: str = "id",
 ) -> dict[str, Any]:
     """Klasifikasi + eksekusi intent, return balasan terstruktur."""
-    hasil_konfirmasi = await _proses_konfirmasi_tunda(db, session_id, pesan)
-    if hasil_konfirmasi:
-        return hasil_konfirmasi
+    with konteks_bahasa(kode_bahasa):
+        hasil_konfirmasi = await _proses_konfirmasi_tunda(db, session_id, pesan)
+        if hasil_konfirmasi:
+            return hasil_konfirmasi
 
-    intent, mode_klasifikasi = await tentukan_intent(pesan)
-    try:
-        balasan, aksi = await jalankan_dengan_retry(db, intent, pesan, session_id)
-    except Exception:
-        balasan = "Ada gangguan teknis saat akses database. Coba lagi sebentar ya."
-        aksi = ["error_atlas"]
-        intent = intent if intent != "unknown" else "error"
+        intent, mode_klasifikasi = await tentukan_intent(pesan)
+        try:
+            balasan, aksi = await jalankan_dengan_retry(
+                db, intent, pesan, session_id
+            )
+        except Exception:
+            balasan = t(
+                "Ada gangguan teknis saat akses database. Coba lagi sebentar ya.",
+                "Technical issue accessing the database. Please try again shortly.",
+            )
+            aksi = ["error_atlas"]
+            intent = intent if intent != "unknown" else "error"
 
-    if mode_klasifikasi == "gemini" and "agent:gemini" not in aksi:
-        aksi = ["agent:gemini", *aksi]
+        if mode_klasifikasi == "gemini" and "agent:gemini" not in aksi:
+            aksi = ["agent:gemini", *aksi]
 
-    return {
-        "balasan": balasan,
-        "intent": intent if intent != "unknown" else None,
-        "actions_taken": aksi,
-        "classification_mode": mode_klasifikasi,
-    }
+        return {
+            "balasan": balasan,
+            "intent": intent if intent != "unknown" else None,
+            "actions_taken": aksi,
+            "classification_mode": mode_klasifikasi,
+        }

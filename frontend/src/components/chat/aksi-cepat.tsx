@@ -1,16 +1,6 @@
 "use client";
 
-export interface AksiCepatItem {
-  label: string;
-  pesan: string;
-}
-
-const DAFTAR_AKSI: AksiCepatItem[] = [
-  { label: "Cek Stok", pesan: "stok indomie goreng berapa?" },
-  { label: "Lihat Hutang", pesan: "hutang Bu Sari berapa?" },
-  { label: "Laporan Hari Ini", pesan: "berapa pendapatan hari ini?" },
-  { label: "Restock", pesan: "produk apa yang mau habis?" },
-];
+import { useBahasa } from "@/components/providers/bahasa-provider";
 
 export function AksiCepat({
   onPilih,
@@ -19,9 +9,18 @@ export function AksiCepat({
   onPilih: (pesan: string) => void;
   nonaktif?: boolean;
 }) {
+  const { kamus } = useBahasa();
+
+  const daftarAksi = [
+    { label: kamus.aksiCekStok, pesan: kamus.pesanCekStok },
+    { label: kamus.aksiLihatHutang, pesan: kamus.pesanLihatHutang },
+    { label: kamus.aksiLaporan, pesan: kamus.pesanLaporan },
+    { label: kamus.aksiRestock, pesan: kamus.pesanRestock },
+  ];
+
   return (
     <div className="flex flex-wrap gap-2">
-      {DAFTAR_AKSI.map((aksi) => (
+      {daftarAksi.map((aksi) => (
         <button
           key={aksi.label}
           type="button"

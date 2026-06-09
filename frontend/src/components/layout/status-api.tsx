@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBahasa } from "@/components/providers/bahasa-provider";
 import { cekKesehatanApi } from "@/lib/api";
 
 export function StatusApi() {
+  const { kamus } = useBahasa();
   const [status, setStatus] = useState<"memuat" | "hidup" | "mati">("memuat");
 
   useEffect(() => {
@@ -27,10 +29,7 @@ export function StatusApi() {
       role="alert"
       className="border-b border-red-200 bg-red-50 px-4 py-2 text-center text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-100"
     >
-      API tidak terjangkau. Jalankan backend:{" "}
-      <code className="rounded bg-red-100 px-1 dark:bg-red-900">
-        uvicorn app.main:aplikasi --reload --port 8000
-      </code>
+      {kamus.apiTidakTerjangkau}
     </div>
   );
 }

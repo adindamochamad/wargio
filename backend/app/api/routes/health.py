@@ -29,8 +29,18 @@ async def health_check() -> dict:
         mcp_ok = True
 
     from app.services.agent_gemini import gemini_runtime_ok
+
     gemini_ok = gemini_runtime_ok()
-    gemini_aktif = pengaturan.gemini_terkonfigurasi and gemini_ok is not False
+    if gemini_ok is None:
+        gemini_ok = False
+    # agent_mode=gemini hanya jika runtime Gemini sudah terbukti sukses (bukan sekadar terkonfigurasi)
+    gemini_aktif = pengaturan.gemini_terkonfigurasi and gemini_ok is True
+
+    klasifikasi = (
+        "gemini_with_regex_fallback"
+        if gemini_aktif
+        else "regex"
+    )
 
     return {
         "status": "ok",
@@ -40,10 +50,14 @@ async def health_check() -> dict:
         "mcp": mcp_ok,
         "mcp_live_enabled": mcp_live,
         "mcp_mode": "live_stdio" if mcp_live else "pymongo_equivalent",
+        "mcp_tools": ["find", "aggregate", "insertOne", "updateOne"],
+        "mcp_verify_local": "npm run verifikasi:mcp",
         "gemini_configured": pengaturan.gemini_terkonfigurasi,
         "gemini_available": gemini_ok,
         "agent_engine_id": pengaturan.agent_engine_id or None,
         "agent_engine_deployed": bool(pengaturan.agent_engine_id),
-        "agent_mode": "gemini" if gemini_aktif else "intent_engine",
+        "classification": klasifikasi,
+        "agent_mode": klasifikasi,
         "system_prompt": "backend/app/prompts/wargio_system.txt",
+        "judge_smoke": "bash scripts/judge_verify.sh",
     }

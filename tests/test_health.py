@@ -15,3 +15,6 @@ async def test_health_return_200() -> None:
     data = res.json()
     assert data["status"] == "ok"
     assert data["service"] == "wargio-api"
+    assert data["mcp_tools"] == ["find", "aggregate", "insertOne", "updateOne"]
+    assert data["agent_mode"] in ("gemini_with_regex_fallback", "regex")
+    assert data["judge_smoke"] == "bash scripts/judge_verify.sh"

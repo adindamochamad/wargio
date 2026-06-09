@@ -12,6 +12,18 @@ from app.services.atlas_tools import mcp_aggregate, mcp_find
 from app.services.klasifikasi import ekstrak_nama_customer, ekstrak_nama_produk
 from app.services.produk import resolve_produk_tunggal
 from app.util.format import format_rupiah, tanggal_indonesia
+from app.util.lokalisasi import ambil_bahasa, t
+
+_NAMA_HARI_ID = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+_NAMA_HARI_EN = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+]
 
 
 async def handle_check_stock(
@@ -22,38 +34,54 @@ async def handle_check_stock(
     kata_kunci = ekstrak_nama_produk(pesan)
     if not kata_kunci:
         return (
-            "Produk mana yang ingin dicek stoknya, Bu/Pak? "
-            "Contoh: \"stok mie instan berapa?\"",
+            t(
+                'Produk mana yang ingin dicek stoknya, Bu/Pak? '
+                'Contoh: "stok mie instan berapa?"',
+                'Which product stock should I check? '
+                'Example: "how much instant noodle stock is left?"',
+            ),
             ["minta_spesifikasi_produk"],
         )
 
     produk, opsi, aksi_cari = await resolve_produk_tunggal(db, kata_kunci)
     if opsi:
+        label_stok = t("stok", "stock")
         baris = "\n".join(
-            f"  {i + 1}. {p['name']} (stok: {p['stock_current']})"
+            f"  {i + 1}. {p['name']} ({label_stok}: {p['stock_current']})"
             for i, p in enumerate(opsi)
         )
         return (
-            f"Maksudnya yang mana?\n{baris}",
+            t(
+                f"Maksudnya yang mana?\n{baris}",
+                f"Which one did you mean?\n{baris}",
+            ),
             [*aksi_cari, "disambiguasi_produk"],
         )
     if not produk:
         return (
-            f"Produk \"{kata_kunci}\" tidak ditemukan. Coba sebut nama yang lebih spesifik.",
+            t(
+                f'Produk "{kata_kunci}" tidak ditemukan. '
+                "Coba sebut nama yang lebih spesifik.",
+                f'Product "{kata_kunci}" not found. '
+                "Try a more specific name.",
+            ),
             [*aksi_cari, "produk_tidak_ditemukan"],
         )
 
     stok = produk["stock_current"]
     minimum = produk["stock_minimum"]
-    status = "aman"
     if stok <= minimum:
-        status = "hampir habis — perlu restock"
+        status = t("hampir habis — perlu restock", "low — restock needed")
     elif stok <= minimum * 1.2:
-        status = "mendekati minimum"
+        status = t("mendekati minimum", "near minimum")
+    else:
+        status = t("aman", "OK")
 
-    balasan = (
+    balasan = t(
         f"Stok **{produk['name']}**: {stok} {produk['unit']} "
-        f"(minimum {minimum}). Status: {status}."
+        f"(minimum {minimum}). Status: {status}.",
+        f"Stock **{produk['name']}**: {stok} {produk['unit']} "
+        f"(minimum {minimum}). Status: {status}.",
     )
     return balasan, [*aksi_cari, "compare_minimum"]
 
@@ -66,7 +94,10 @@ async def handle_check_debt(
     nama = ekstrak_nama_customer(pesan)
     if not nama:
         return (
-            "Hutang siapa yang ingin dicek? Contoh: \"hutang Bu Sari berapa?\"",
+            t(
+                'Hutang siapa yang ingin dicek? Contoh: "hutang Bu Sari berapa?"',
+                'Whose debt should I check? Example: "how much debt does Bu Sari have?"',
+            ),
             ["minta_nama_customer"],
         )
 
@@ -79,26 +110,46 @@ async def handle_check_debt(
 
     if len(hasil) == 0:
         return (
-            f"Customer \"{nama}\" tidak ditemukan.",
+            t(
+                f'Customer "{nama}" tidak ditemukan.',
+                f'Customer "{nama}" not found.',
+            ),
             [*aksi, "customer_tidak_ditemukan"],
         )
     if len(hasil) > 1:
         baris = "\n".join(f"  {i + 1}. {c['name']}" for i, c in enumerate(hasil))
-        return f"Ada beberapa yang cocok:\n{baris}", [*aksi, "disambiguasi_customer"]
+        return (
+            t(
+                f"Ada beberapa yang cocok:\n{baris}",
+                f"Several matches found:\n{baris}",
+            ),
+            [*aksi, "disambiguasi_customer"],
+        )
 
     cust = hasil[0]
     total = cust.get("debt_total", 0)
     if total <= 0:
-        return f"{cust['name']} tidak punya hutang aktif.", aksi
+        return (
+            t(
+                f"{cust['name']} tidak punya hutang aktif.",
+                f"{cust['name']} has no outstanding debt.",
+            ),
+            aksi,
+        )
 
     belum_bayar = [h for h in cust.get("debt_history", []) if not h.get("paid")]
     rincian = "\n".join(
         f"  - {format_rupiah(h['amount'])} ({h.get('description', '-')})"
         for h in belum_bayar[:5]
     )
+    kosong = t("  (tidak ada detail)", "  (no details)")
     return (
-        f"Hutang **{cust['name']}** total **{format_rupiah(total)}**.\n"
-        f"Rincian:\n{rincian or '  (tidak ada detail)'}",
+        t(
+            f"Hutang **{cust['name']}** total **{format_rupiah(total)}**.\n"
+            f"Rincian:\n{rincian or kosong}",
+            f"**{cust['name']}** owes **{format_rupiah(total)}** in total.\n"
+            f"Breakdown:\n{rincian or kosong}",
+        ),
         [*aksi, "hitung_total_hutang"],
     )
 
@@ -115,17 +166,27 @@ async def handle_restock_alert(db: AsyncDatabase) -> tuple[str, list[str]]:
     )
 
     if not hasil:
-        return "Semua produk masih aman, tidak ada yang perlu restock urgent.", aksi
+        return (
+            t(
+                "Semua produk masih aman, tidak ada yang perlu restock urgent.",
+                "All products are fine — nothing needs urgent restock.",
+            ),
+            aksi,
+        )
 
     baris = []
     for p in hasil:
         selisih = p["stock_minimum"] - p["stock_current"]
+        label_kurang = t("kurang", "short by")
         baris.append(
             f"  - **{p['name']}**: {p['stock_current']}/{p['stock_minimum']} "
-            f"{p['unit']} (kurang {max(selisih, 0)})"
+            f"{p['unit']} ({label_kurang} {max(selisih, 0)})"
         )
     return (
-        f"Produk yang perlu restock ({len(hasil)}):\n" + "\n".join(baris),
+        t(
+            f"Produk yang perlu restock ({len(hasil)}):\n" + "\n".join(baris),
+            f"Products needing restock ({len(hasil)}):\n" + "\n".join(baris),
+        ),
         [*aksi, "rank_urgency"],
     )
 
@@ -140,12 +201,13 @@ async def handle_sales_report(
     awal_hari = sekarang.replace(hour=0, minute=0, second=0, microsecond=0)
 
     teks = pesan.lower()
-    if "minggu" in teks:
+    if "minggu" in teks or "week" in teks:
         awal = awal_hari - timedelta(days=7)
-        label = "7 hari terakhir"
+        label = t("7 hari terakhir", "last 7 days")
     else:
         awal = awal_hari
-        label = f"hari ini ({tanggal_indonesia(sekarang.astimezone(timezone.utc))})"
+        tanggal = tanggal_indonesia(sekarang.astimezone(timezone.utc))
+        label = t(f"hari ini ({tanggal})", f"today ({tanggal})")
 
     awal_utc = awal.astimezone(timezone.utc)
     sekarang_utc = sekarang.astimezone(timezone.utc)
@@ -168,12 +230,23 @@ async def handle_sales_report(
     agg, aksi = await mcp_aggregate(db, "transactions", pipeline)
 
     if not agg:
-        return f"Belum ada penjualan untuk {label}.", aksi
+        return (
+            t(
+                f"Belum ada penjualan untuk {label}.",
+                f"No sales recorded for {label}.",
+            ),
+            aksi,
+        )
 
     data = agg[0]
+    tx_label = t("transaksi", "transactions")
     return (
-        f"Pendapatan **{label}**: **{format_rupiah(data['total_omzet'])}** "
-        f"dari {data['jumlah_transaksi']} transaksi.",
+        t(
+            f"Pendapatan **{label}**: **{format_rupiah(data['total_omzet'])}** "
+            f"dari {data['jumlah_transaksi']} transaksi.",
+            f"Revenue **{label}**: **{format_rupiah(data['total_omzet'])}** "
+            f"from {data['jumlah_transaksi']} {tx_label}.",
+        ),
         [*aksi, "format_laporan"],
     )
 
@@ -188,7 +261,13 @@ async def handle_debt_collection(db: AsyncDatabase) -> tuple[str, list[str]]:
         sort=[("debt_total", -1)],
     )
     if not hasil:
-        return "Tidak ada customer dengan hutang aktif.", aksi
+        return (
+            t(
+                "Tidak ada customer dengan hutang aktif.",
+                "No customers with outstanding debt.",
+            ),
+            aksi,
+        )
 
     baris = []
     for c in hasil:
@@ -196,7 +275,10 @@ async def handle_debt_collection(db: AsyncDatabase) -> tuple[str, list[str]]:
             f"  - **{c['name']}**: {format_rupiah(c.get('debt_total', 0))}"
         )
     return (
-        f"Pelanggan dengan hutang aktif ({len(hasil)}):\n" + "\n".join(baris),
+        t(
+            f"Pelanggan dengan hutang aktif ({len(hasil)}):\n" + "\n".join(baris),
+            f"Customers with outstanding debt ({len(hasil)}):\n" + "\n".join(baris),
+        ),
         [*aksi, "sort_debt"],
     )
 
@@ -208,7 +290,7 @@ async def handle_sales_forecast(db: AsyncDatabase) -> tuple[str, list[str]]:
     awal = (sekarang - timedelta(days=30)).astimezone(timezone.utc)
     besok = (sekarang + timedelta(days=1)).weekday()
 
-    nama_hari = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"]
+    nama_hari = _NAMA_HARI_EN if ambil_bahasa() == "en" else _NAMA_HARI_ID
 
     pipeline: list[dict[str, Any]] = [
         {"$match": {"type": "sale", "created_at": {"$gte": awal}}},
@@ -223,9 +305,14 @@ async def handle_sales_forecast(db: AsyncDatabase) -> tuple[str, list[str]]:
     agg, aksi = await mcp_aggregate(db, "transactions", pipeline)
 
     if not agg:
-        return "Belum cukup data penjualan untuk perkiraan.", aksi
+        return (
+            t(
+                "Belum cukup data penjualan untuk perkiraan.",
+                "Not enough sales data for a forecast.",
+            ),
+            aksi,
+        )
 
-    # MongoDB dayOfWeek: 1=Minggu ... 7=Sabtu; Python weekday: 0=Senin
     peta_mongo_ke_py = {2: 0, 3: 1, 4: 2, 5: 3, 6: 4, 7: 5, 1: 6}
     peta_py: dict[int, dict[str, Any]] = {}
     for baris in agg:
@@ -238,11 +325,21 @@ async def handle_sales_forecast(db: AsyncDatabase) -> tuple[str, list[str]]:
         }
 
     pred = peta_py.get(besok, {"avg_tx": 0, "avg_omzet": 0})
-    level = "ramai" if pred["avg_tx"] >= 8 else "sedang" if pred["avg_tx"] >= 4 else "sepi"
+    if pred["avg_tx"] >= 8:
+        level = t("ramai", "busy")
+    elif pred["avg_tx"] >= 4:
+        level = t("sedang", "moderate")
+    else:
+        level = t("sepi", "quiet")
 
     return (
-        f"Perkiraan **{nama_hari[besok]}** (besok): cenderung **{level}**.\n"
-        f"Rata-rata historis: ~{pred['avg_tx']:.0f} transaksi, "
-        f"omzet ~{format_rupiah(pred['avg_omzet'])} per hari serupa.",
+        t(
+            f"Perkiraan **{nama_hari[besok]}** (besok): cenderung **{level}**.\n"
+            f"Rata-rata historis: ~{pred['avg_tx']:.0f} transaksi, "
+            f"omzet ~{format_rupiah(pred['avg_omzet'])} per hari serupa.",
+            f"Forecast for **{nama_hari[besok]}** (tomorrow): likely **{level}**.\n"
+            f"Historical average: ~{pred['avg_tx']:.0f} transactions, "
+            f"revenue ~{format_rupiah(pred['avg_omzet'])} on similar days.",
+        ),
         [*aksi, "forecast_day_of_week"],
     )

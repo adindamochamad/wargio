@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { BahasaProvider } from "@/components/providers/bahasa-provider";
 import { TemaProvider } from "@/components/providers/tema-provider";
 import "./globals.css";
 
@@ -13,6 +14,16 @@ export const metadata: Metadata = {
   title: "Wargio — Asisten Warung",
   description:
     "AI agent untuk pemilik warung Indonesia — stok, hutang, penjualan.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
+  },
+};
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 const skripTemaAwal = `
@@ -39,7 +50,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-full antialiased">
         <TemaProvider>
-          <ErrorBoundary>{children}</ErrorBoundary>
+          <BahasaProvider>
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </BahasaProvider>
         </TemaProvider>
       </body>
     </html>

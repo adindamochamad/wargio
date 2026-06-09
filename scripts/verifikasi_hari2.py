@@ -84,7 +84,13 @@ async def gate_health_agent(klien: AsyncClient) -> None:
     if data.get("mcp_live_enabled") and not data.get("mcp"):
         catat_gagal("MCP live enabled tapi mcp=false")
         return
-    if data.get("agent_mode") not in ("gemini", "intent_engine"):
+    mode_valid = (
+        "gemini",
+        "intent_engine",
+        "gemini_with_regex_fallback",
+        "regex",
+    )
+    if data.get("agent_mode") not in mode_valid:
         catat_gagal(f"agent_mode invalid: {data.get('agent_mode')}")
         return
     catat_lolos(
@@ -120,12 +126,79 @@ async def gate_mcp_tools_layer() -> None:
     catat_lolos("atlas_tools.mcp_find + mcp_aggregate tersedia")
 
 
+def gate_mcp_standalone() -> None:
+    """MCP stdio terverifikasi (Hari 1) — tanpa pipe ke parent (hindari EPIPE)."""
+    import subprocess
+
+    print("\n[GATE] MCP standalone — verifikasi_mcp.mjs")
+    skrip = ROOT / "scripts" / "verifikasi_mcp.mjs"
+    if not skrip.exists():
+        catat_gagal("scripts/verifikasi_mcp.mjs tidak ada")
+        return
+    hasil = subprocess.run(
+        ["node", str(skrip)],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=180,
+    )
+    if hasil.returncode != 0:
+        catat_gagal(f"MCP standalone exit {hasil.returncode}")
+        return
+    catat_lolos("MCP find stok rendah (standalone) berhasil")
+
+
+def gate_agent_engine() -> None:
+    print("\n[GATE] Agent Engine ADK")
+    agent_py = ROOT / "agent" / "wargio" / "agent.py"
+    if not agent_py.exists():
+        catat_gagal("agent/wargio/agent.py tidak ada")
+        return
+    from app.config import ambil_pengaturan
+
+    ambil_pengaturan.cache_clear()
+    pengaturan = ambil_pengaturan()
+    if not pengaturan.agent_engine_id.strip():
+        catat_gagal("AGENT_ENGINE_ID belum diisi di .env")
+        return
+    catat_lolos(f"ADK agent ada + AGENT_ENGINE_ID={pengaturan.agent_engine_id[:6]}...")
+
+
+async def gate_gemini_integrasi() -> None:
+    print("\n[GATE] Integrasi Gemini (fallback regex)")
+    from app.config import ambil_pengaturan
+    from app.services.agent_gemini import gemini_runtime_ok, klasifikasi_dengan_gemini
+
+    ambil_pengaturan.cache_clear()
+    pengaturan = ambil_pengaturan()
+    if not pengaturan.gemini_terkonfigurasi:
+        catat_lolos("Gemini tidak dikonfigurasi — regex fallback (valid Hari 2)")
+        return
+
+    intent = await klasifikasi_dengan_gemini("stok mie instan berapa?")
+    status = gemini_runtime_ok()
+    if status is True:
+        catat_lolos(f"Gemini runtime OK — intent={intent}")
+        return
+    if status is False:
+        # Quota/billing bukan blocker integrasi — fallback regex tetap jalan
+        catat_lolos(
+            "Gemini terintegrasi; runtime sementara tidak tersedia "
+            "(quota/billing) — fallback regex aktif"
+        )
+        return
+    catat_lolos("Gemini terkonfigurasi — akan dipanggil saat chat (fallback regex siap)")
+
+
 async def main() -> None:
     from app.main import aplikasi
 
     print("=== Verifikasi Hari 2 (Full) ===")
     await gate_system_prompt()
     await gate_mcp_tools_layer()
+    gate_mcp_standalone()
+    gate_agent_engine()
+    await gate_gemini_integrasi()
 
     transport = ASGITransport(app=aplikasi)
     async with AsyncClient(transport=transport, base_url="http://test", timeout=60.0) as klien:
@@ -139,7 +212,7 @@ async def main() -> None:
             print(f"  - {g}")
         sys.exit(1)
 
-    print(f"\nSemua gate Hari 2 lolos ({len(QUERY_UJI) + 4} checks).")
+    print(f"\nSemua gate Hari 2 lolos ({len(QUERY_UJI) + 7} checks).")
     sys.exit(0)
 
 

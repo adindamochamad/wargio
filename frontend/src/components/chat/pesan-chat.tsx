@@ -26,8 +26,11 @@ export function PesanChat({ pesan }: { pesan: PesanUi }) {
         ) : (
           <TeksBalasan teks={pesan.isi} />
         )}
-        {!dariUser && pesan.intent && (
-          <p className="mt-2 text-[10px] uppercase tracking-wide text-zinc-400">
+        {!dariUser && pesan.intent && process.env.NODE_ENV === "development" && (
+          <p
+            className="mt-2 text-[10px] uppercase tracking-wide text-zinc-400"
+            aria-hidden
+          >
             {pesan.intent}
           </p>
         )}

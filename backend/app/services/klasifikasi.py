@@ -28,36 +28,50 @@ POLA_INTENT: list[tuple[str, list[str]]] = [
         r"rekap.*hutang", r"semua.*piutang", r"penagihan",
         r"daftar.*(?:bon|piutang)", r"siapa.*(?:ada\s+)?bon",
         r"tampilkan.*(?:hutang|piutang)",
+        r"who.*(?:hasn.t|has not|not).*paid", r"who.*owes",
+        r"unpaid.*debt", r"debt.*collection", r"outstanding.*debt",
     ]),
     ("record_payment", [
         r"(?<!belum )bayar\s+(?:hutang|utang|piutang)",
         r"lunasi\s+hutang",
         r"pelunasan\s+hutang",
+        r"pay(?:s|ing)?\s+(?:debt|the debt)",
+        r"paid?\s+(?:debt|hutang)",
+        r"debt\s+payment",
     ]),
     ("record_sale", [
         r"\bjual\b", r"terjual", r"catat penjualan", r"catat jualan",
         r"tadi jual",
+        r"\bsold\b", r"\bsell\b", r"record\s+(?:a\s+)?sale",
+        r"just\s+sold",
     ]),
     ("sales_forecast", [
         r"forecast", r"prediksi", r"perkiraan penjualan",
         r"besok.*(?:ramai|rame|sepi)",
         r"ramai\s+(?:ga|gak|tidak)?\s*besok",
         r"kira.kira.*(?:ramai|rame)",
+        r"tomorrow.*(?:busy|quiet)", r"will.*be\s+busy",
     ]),
     ("restock_alert", [
         r"mau habis", r"restock", r"perlu restock", r"stok kritis",
         r"produk apa yang", r"barang apa yang",
+        r"running low", r"low stock", r"which products",
+        r"need(?:s)? restock",
     ]),
     ("sales_report", [
         r"pendapatan", r"omzet", r"omset", r"penjualan hari",
         r"laporan penjualan", r"berapa jualan", r"total jual",
+        r"revenue", r"earnings", r"sales today", r"today.s revenue",
+        r"weekly revenue", r"how much.*(?:sold|sales)",
     ]),
     ("check_debt", [
         r"hutang", r"piutang", r"utang", r"belum lunas",
+        r"\bdebt\b", r"owes", r"outstanding",
     ]),
     ("check_stock", [
         r"stok", r"stock", r"tinggal berapa", r"ada berapa",
         r"sisa berapa", r"masih ada",
+        r"how much.*stock", r"stock.*left",
     ]),
 ]
 
@@ -78,6 +92,8 @@ def ekstrak_nama_produk(pesan: str) -> Optional[str]:
     """Ambil kata kunci produk setelah kata stok/stock."""
     teks = normalisasi_teks(pesan)
     for pola in (
+        r"how much\s+(.+?)\s+stock(?:\s+is left)?",
+        r"stock of\s+(.+?)(?:\?|$)",
         r"stok\s+(.+?)(?:\s+berapa|\?|$)",
         r"stock\s+(.+?)(?:\s+berapa|\?|$)",
         r"tinggal berapa\s+(.+?)(?:\?|$)",
@@ -96,9 +112,14 @@ def ekstrak_nama_customer(pesan: str) -> Optional[str]:
     teks = normalisasi_teks(pesan)
     if re.search(r"bayar\s+(?:hutang|utang)", teks):
         return None
-    m = re.search(r"hutang\s+(.+?)(?:\?|$|total|berapa)", teks)
-    if m:
-        return m.group(1).strip()
+    for pola in (
+        r"hutang\s+(.+?)(?:\?|$|total|berapa)",
+        r"debt\s+(?:of\s+|does\s+)?(.+?)(?:\s+have|\?|$)",
+        r"how much debt does\s+(.+?)(?:\s+have|\?|$)",
+    ):
+        m = re.search(pola, teks)
+        if m:
+            return m.group(1).strip()
     return None
 
 

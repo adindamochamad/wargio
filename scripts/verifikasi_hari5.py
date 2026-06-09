@@ -86,12 +86,19 @@ async def gate_lokal_api() -> None:
         print("  INFO: API lokal tidak jalan — lewati")
 
 
+def _url_production() -> str:
+    return (
+        os.getenv("WARGIO_PRODUCTION_URL", "").strip()
+        or os.getenv("WARGIO_PUBLIC_URL", "").strip()
+    ).rstrip("/")
+
+
 def gate_smoke_production() -> None:
     print("\n[GATE] Smoke production URL")
-    url = os.getenv("WARGIO_PRODUCTION_URL", "").strip().rstrip("/")
+    url = _url_production()
     if not url:
         print(
-            "  INFO: Set WARGIO_PRODUCTION_URL=https://domain untuk smoke penuh"
+            "  INFO: Set WARGIO_PRODUCTION_URL atau WARGIO_PUBLIC_URL untuk smoke penuh"
         )
         return
 
@@ -110,22 +117,103 @@ def gate_smoke_production() -> None:
     catat_lolos(f"Smoke production lolos: {url}")
 
 
+def gate_devpost_live_url() -> None:
+    print("\n[GATE] Devpost — Live URL siap")
+    doc = ROOT / "docs" / "devpost-submission.md"
+    if not doc.exists():
+        catat_gagal("docs/devpost-submission.md belum ada")
+        return
+    teks = doc.read_text(encoding="utf-8")
+    url = "https://wargio.adindamochamad.com"
+    if url not in teks or "Project URL" not in teks:
+        catat_gagal("Devpost draft belum berisi Project URL production")
+        return
+    catat_lolos(f"Live URL Devpost siap: {url} (docs/devpost-submission.md)")
+
+
 def gate_readme_live_url() -> None:
-    print("\n[GATE] README bagian deploy")
-    readme = (ROOT / "README.md").read_text()
-    if "deploy-vps" in readme or "Production" in readme or "VPS" in readme:
-        catat_lolos("README menyebut deploy production")
+    print("\n[GATE] README Live URL ## Demo")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    bagian_demo = ""
+    if "## Demo" in readme:
+        bagian_demo = readme.split("## Demo", 1)[1].split("##", 1)[0]
+    if "adindamochamad.com" in bagian_demo:
+        catat_lolos("README ## Demo: Live URL production")
     else:
-        catat_gagal("README belum ada bagian deploy — tambahkan Live URL")
+        catat_gagal("README ## Demo belum berisi Live URL production")
+
+
+def gate_docker_nginx() -> None:
+    print("\n[GATE] Docker + Nginx template")
+    compose = (ROOT / "deploy/docker/docker-compose.yml").read_text(encoding="utf-8")
+    if "3010:3000" not in compose:
+        catat_gagal("docker-compose belum map web ke host :3010")
+    else:
+        catat_lolos("docker-compose web 3010:3000")
+    nginx = ROOT / "deploy/nginx/wargio.conf.example"
+    if not nginx.exists():
+        catat_gagal("nginx template hilang")
+        return
+    teks_nginx = nginx.read_text(encoding="utf-8")
+    if "127.0.0.1:3010" in teks_nginx and "location /api/" in teks_nginx:
+        catat_lolos("nginx upstream :3010 + proxy /api")
+    else:
+        catat_gagal("nginx template tidak lengkap")
+
+
+def gate_k6_dokumentasi() -> None:
+    print("\n[GATE] Dokumentasi load test k6")
+    doc = ROOT / "docs/hari5-load-test.md"
+    skrip = ROOT / "deploy/k6/smoke_10_users.js"
+    if not doc.exists() or not skrip.exists():
+        catat_gagal("hari5-load-test.md atau skrip k6 hilang")
+        return
+    if "2.84" in doc.read_text(encoding="utf-8"):
+        catat_lolos("p95 2.84s terdokumentasi (threshold <5s)")
+    else:
+        catat_gagal("docs/hari5-load-test.md belum mencatat hasil p95")
+
+
+async def gate_https_production() -> None:
+    print("\n[GATE] HTTPS production")
+    url = _url_production()
+    if not url:
+        print("  INFO: Lewati HTTPS — URL production tidak diset")
+        return
+    if not url.startswith("https://"):
+        catat_gagal("URL production harus HTTPS")
+        return
+    try:
+        import httpx
+    except ImportError:
+        catat_gagal("httpx tidak terpasang")
+        return
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as klien:
+            r = await klien.get(f"{url}/api/health")
+            if r.status_code != 200:
+                catat_gagal(f"HTTPS health {r.status_code}")
+                return
+            body = r.json()
+            if body.get("atlas") is not True:
+                catat_gagal("Production atlas!=true — cek Atlas allowlist VPS")
+                return
+            catat_lolos(f"HTTPS {url}/api/health 200 + atlas=true")
+    except Exception as e:
+        catat_gagal(f"HTTPS production: {e}")
 
 
 async def main() -> None:
     print("=== Verifikasi Hari 5 Wargio (VPS) ===")
     gate_artifact_deploy()
+    gate_docker_nginx()
     gate_env_production_template()
     gate_rate_limit_unit()
+    gate_k6_dokumentasi()
     await gate_lokal_api()
+    await gate_https_production()
     gate_smoke_production()
+    gate_devpost_live_url()
     gate_readme_live_url()
 
     print("\n=== Ringkasan ===")
@@ -134,8 +222,7 @@ async def main() -> None:
         for g in GAGAL:
             print(f"  - {g}")
         sys.exit(1)
-    print("\nHari 5 artifact VPS: LOLOS.")
-    print("Deploy: ikuti docs/deploy-vps.md lalu smoke dengan WARGIO_PRODUCTION_URL.")
+    print(f"\nHari 5 Deploy & Production: SEMUA GATE LOLOS ({len(LOLOS)} checks).")
     sys.exit(0)
 
 
